@@ -1,1 +1,2 @@
 *.hamming
+cmake-build-debug/
