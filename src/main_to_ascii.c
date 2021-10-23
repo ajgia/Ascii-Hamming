@@ -218,11 +218,13 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     struct application_settings *app_settings;
     const char *parity;
     const char *prefix;
+    char * pathArr;
 
-    char chars[BUF_SIZE];
+    
     ssize_t nread;
     int ret_val;
     bool isEvenParity;
+    int fd;
     
     DC_TRACE(env);
     ret_val = 0;
@@ -232,15 +234,30 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // Get settings
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-    if (dc_error_has_error) {
+    isEvenParity = isEvenParitySetting(parity);
+   
+    if (dc_error_has_error(err)) {
+        display("setup error");
         error_reporter(err);
     }
     
-    isEvenParity = isEvenParitySetting(parity);
+    pathArr = constructFilePathArray(env, err, prefix);
 
-    if (dc_error_has_no_error(err)) {
-        
+    for (size_t i = 0; i < 12; i++) {
+        fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
+
+        if (dc_error_has_no_error(err)) {
+            char* chars = calloc(BUF_SIZE, 1024);
+            while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
+                dc_write(env, err, STDOUT_FILENO, chars, (size_t)nread);
+            }
+            free(chars);
+        }
+        else error_reporter(err);
+
     }
+
+
     return ret_val;
 }
 
