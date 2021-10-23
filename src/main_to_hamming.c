@@ -96,7 +96,6 @@ void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
                                             const struct dc_error *err, 
                                             const uint8_t,
                                             uint16_t * dest);
-bool isEvenParitySetting(const char * parity);
 void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
 
@@ -201,20 +200,6 @@ static int destroy_settings(const struct dc_posix_env *env,
 
     return 0;
 }
-
-// Return 1 (true) for even, 0 for odd
-// TODO: use dc_strncmp
-bool isEvenParitySetting(const char * parity) {
-    if (strcmp(parity, "odd") == 0)
-        return false;
-    else if (strcmp(parity, "even") == 0)
-        return true;
-    // Default case, default to even
-    else {
-        return true;
-    }
-}
-
 
 static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_application_settings *settings) {
     struct application_settings *app_settings;

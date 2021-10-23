@@ -27,10 +27,11 @@
  */
 int display(const char *str);
 uint16_t set_bit(uint16_t byte, uint16_t mask);
+uint8_t set_bit8(uint8_t byte, uint16_t mask);
 void print_mask(uint16_t byte, uint16_t mask);
 uint16_t get_mask(uint16_t byte, uint16_t  mask);
+uint8_t get_mask8(uint8_t byte, uint8_t mask);
 size_t powerOfTwo(size_t x);
 bool isEven(size_t x);
-uint8_t set_bit8(uint8_t byte, uint16_t mask);
-
+bool isEvenParitySetting(const char * parity);
 #endif // TEMPLATE_COMMON_H

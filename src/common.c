@@ -18,6 +18,7 @@
 #include "common.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <dc_posix/dc_unistd.h>
 
 
@@ -80,4 +81,17 @@ size_t powerOfTwo(size_t x)
 
 bool isEven(size_t x) {
     return (x % 2 == 0);
+}
+
+// Return 1 (true) for even, 0 for odd
+// TODO: use dc_strncmp
+bool isEvenParitySetting(const char * parity) {
+    if (strcmp(parity, "odd") == 0)
+        return false;
+    else if (strcmp(parity, "even") == 0)
+        return true;
+    // Default case, default to even
+    else {
+        return true;
+    }
 }
