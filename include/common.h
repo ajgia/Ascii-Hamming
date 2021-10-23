@@ -1,6 +1,7 @@
 #ifndef TEMPLATE_COMMON_H
 #define TEMPLATE_COMMON_H
-
+#include <stdlib.h>
+#include <dc_posix/dc_unistd.h>
 /*
  * This file is part of dc_dump.
  *
@@ -25,5 +26,11 @@
  * @return a return value to be documented.
  */
 int display(const char *str);
+uint16_t set_bit(uint16_t byte, uint16_t mask);
+void print_mask(uint16_t byte, uint16_t mask);
+uint16_t get_mask(uint16_t byte, uint16_t  mask);
+size_t powerOfTwo(size_t x);
+bool isEven(size_t x);
+uint8_t set_bit8(uint8_t byte, uint16_t mask);
 
 #endif // TEMPLATE_COMMON_H

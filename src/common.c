@@ -16,11 +16,68 @@
  */
 
 #include "common.h"
+#include <stdlib.h>
 #include <stdio.h>
+#include <dc_posix/dc_unistd.h>
+
 
 int display(const char *str)
 {
     printf("%s\n", str);
 
     return 0;
+}
+
+uint16_t set_bit(uint16_t byte, uint16_t mask) {
+    uint16_t set;
+    set = byte | mask;
+    return set;
+}
+
+uint8_t set_bit8(uint8_t byte, uint16_t mask) {
+    uint8_t set;
+    set = byte | mask;
+    return set;
+}
+
+void print_mask(uint16_t byte, uint16_t mask) {
+    uint16_t masked;
+    masked = byte & mask;
+    printf("%u\n", masked);
+}
+
+uint16_t get_mask(uint16_t byte, uint16_t  mask) {
+    uint16_t masked;
+    masked = byte & mask;
+    return masked;
+}
+
+uint8_t get_mask8(uint8_t byte, uint8_t mask) {
+    uint8_t masked;
+    masked = byte & mask;
+    return masked;
+}
+
+/**
+ * Returns 1 if argument is a power of two, 0 otherwise
+ */
+size_t powerOfTwo(size_t x)
+{
+   //checks whether a number is zero or not
+   if (x == 0)
+      return 0;
+
+   //true till x is not equal to 1
+   while( x != 1)
+   {
+      //checks whether a number is divisible by 2
+      if(x % 2 != 0)
+         return 0;
+         x /= 2;
+   }
+   return 1;
+}
+
+bool isEven(size_t x) {
+    return (x % 2 == 0);
 }
