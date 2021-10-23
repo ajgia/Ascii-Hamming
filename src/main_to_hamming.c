@@ -275,6 +275,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
             free(arr);
             free(dest);
         }
+
         // printf("ret_val: %d\n", ret_val);
 
     }
@@ -366,38 +367,10 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
 }
 
 void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
-    char pathBeginning[BUF_SIZE] = "";
-    const char rel[] = "./";
-    const char ext[] = ".hamming";
-    const char sep[] = "-";
-    char pathArr[12][BUF_SIZE] = {{0}};
-
+    char* pathArr;
     int fd;
-
-    // Make common filepath start
-    strncat(pathBeginning, rel, strlen(rel));
-    strncat(pathBeginning, prefix, strlen(prefix));
-    strncat(pathBeginning, sep, strlen(sep));
-    // printf("path beginning: %s\n", pathBeginning);
-
-    // Make an array of strings containing the filepaths 1 through 12
-    // Format: {prefix}-0.hamming, {prefix}-1.hamming , ...., {prefix}-11.hamming 
-    for (size_t i = 0; i < 12 ; i++) {
-        char path[BUF_SIZE] = "";
-
-
-        strncpy(path, pathBeginning, strlen(pathBeginning));
-        
-        // Number append
-        char buffer[10];
-        snprintf(buffer, 10, "%d", i);
-        strncat(path, buffer, strlen(buffer));
-
-        strncat(path, ext, strlen(ext));
-        // printf("path: %s\n", path);
-        strncpy(pathArr[i], path, strlen(path));
-        // printf("path: %s\n", pathArr[i]);
-    }
+    pathArr = constructFilePathArray(env, err, prefix);
+    
 
     if (dc_error_has_error(err)) {
         error_reporter(err);
@@ -405,7 +378,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
 
     // Open write and close each file in this loop
     for (size_t i = 0; i < 12; i++) {
-        fd = dc_open(env, err, pathArr[i], DC_O_CREAT | DC_O_TRUNC | DC_O_WRONLY, S_IRUSR | S_IWUSR);
+        fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_CREAT | DC_O_TRUNC | DC_O_WRONLY, S_IRUSR | S_IWUSR);
         if (dc_error_has_error(err)) {
             error_reporter(err);
         }
@@ -431,6 +404,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
 
         dc_close(env, err, fd);
     }
+    destroyArray(pathArr);
 }
 
 static void error_reporter(const struct dc_error *err) {

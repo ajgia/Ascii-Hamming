@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <dc_posix/dc_unistd.h>
-
+#define BUF_SIZE 1024
 
 int display(const char *str)
 {
@@ -94,4 +94,45 @@ bool isEvenParitySetting(const char * parity) {
     else {
         return true;
     }
+}
+
+char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix) {
+    char pathBeginning[BUF_SIZE] = "";
+    const char rel[] = "./";
+    const char ext[] = ".hamming";
+    const char sep[] = "-";
+
+    // char pathArr[12][BUF_SIZE] = {{0}};
+    // Redo this initialization to use dynamic memory so this doesn't delete when going out of scope
+    char* pathArr = (char*)calloc(12*BUF_SIZE, sizeof(char));
+
+    // Make common filepath start
+    strncat(pathBeginning, rel, strlen(rel));
+    strncat(pathBeginning, prefix, strlen(prefix));
+    strncat(pathBeginning, sep, strlen(sep));
+    // printf("path beginning: %s\n", pathBeginning);
+
+    // Make an array of strings containing the filepaths 1 through 12
+    // Format: {prefix}-0.hamming, {prefix}-1.hamming , ...., {prefix}-11.hamming 
+    for (size_t i = 0; i < 12 ; i++) {
+        char path[BUF_SIZE] = "";
+
+        strncpy(path, pathBeginning, strlen(pathBeginning));
+        
+        // Number append
+        char buffer[10];
+        snprintf(buffer, 10, "%d", i);
+        strncat(path, buffer, strlen(buffer));
+
+        strncat(path, ext, strlen(ext));
+        // printf("path: %s\n", path);
+        strncpy((pathArr + (BUF_SIZE*i)), path, strlen(path));
+        // printf("path: %s\n", (pathArr + (BUF_SIZE*i)));
+    }
+
+    return pathArr;
+}
+
+void destroyArray(char* arr) {
+    free(arr);
 }

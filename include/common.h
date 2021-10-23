@@ -19,6 +19,7 @@
  *  along with dc_dump.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+
 /**
  * A function to be documented.
  *
@@ -34,4 +35,7 @@ uint8_t get_mask8(uint8_t byte, uint8_t mask);
 size_t powerOfTwo(size_t x);
 bool isEven(size_t x);
 bool isEvenParitySetting(const char * parity);
+
+char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix);
+void destroyArray(char* arr);
 #endif // TEMPLATE_COMMON_H

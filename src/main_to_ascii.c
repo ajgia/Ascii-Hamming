@@ -232,8 +232,15 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // Get settings
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
+    if (dc_error_has_error) {
+        error_reporter(err);
+    }
+    
+    isEvenParity = isEvenParitySetting(parity);
 
-
+    if (dc_error_has_no_error(err)) {
+        
+    }
     return ret_val;
 }
 
