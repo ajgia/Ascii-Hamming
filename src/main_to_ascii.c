@@ -96,19 +96,8 @@ static void trace_reporter(const struct dc_posix_env *env,
                           const char *file_name,
                           const char *function_name,
                           size_t line_number);
-void createHammingWord( const struct dc_posix_env *env,
-                        const struct dc_error *err, 
-                        char, 
-                        bool*);
-void setParityBits( const struct dc_posix_env *env,
-                        const struct dc_error *err,
-                        bool isEvenParity,
-                        uint16_t * dest);  
-void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
-                                            const struct dc_error *err, 
-                                            const uint8_t,
-                                            uint16_t * dest);
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
+char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord);
+
 
 
 int main(int argc, char * argv[]) {
@@ -219,7 +208,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     const char *parity;
     const char *prefix;
     char * pathArr;
-
+    uint16_t * codeWords;
     
     ssize_t nread;
     int ret_val;
@@ -242,23 +231,70 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     }
     
     pathArr = constructFilePathArray(env, err, prefix);
+    codeWords = (uint16_t*)calloc(8, sizeof(uint16_t));
 
     for (size_t i = 0; i < 12; i++) {
         fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
 
+        // TODO: be able to handle more than 1 byte
         if (dc_error_has_no_error(err)) {
             char* chars = calloc(BUF_SIZE, 1024);
             while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
-                dc_write(env, err, STDOUT_FILENO, chars, (size_t)nread);
+                for (size_t j = 0; j < 8; j++) {
+                    if (get_mask(*chars, masks_16[j])) {
+                        *(codeWords+j) = set_bit(*(codeWords+j), masks_16[i]);
+                    
+                    }
+                }
+
+
+                // dc_write(env, err, STDOUT_FILENO, chars, (size_t)nread);
+
             }
             free(chars);
         }
-        else error_reporter(err);
-
+        else {error_reporter(err);}
+        
+    }
+    // dc_write(env, err, STDOUT_FILENO, codeWords, 8*sizeof(uint16_t));
+    
+    // decode codeWords
+    char decoded[8] = ""; 
+    for (size_t i = 0; i < 8; i++) {
+        char c = decodeCodeWord(env, err, codeWords+i);
+        decoded[i] = c;
     }
 
+    dc_write(env, err, STDOUT_FILENO, decoded, 8);
 
+    free(codeWords);
     return ret_val;
+}
+
+char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord) {
+    char c = '\0';
+    // TODO: parity check and error correction
+
+    // Break apart codeWord into data word
+    size_t j = 0;
+    for (size_t i = 0; i < 12; ++i) {
+        if (!powerOfTwo(i)) {
+            if( get_mask(*codeWord, masks_16[i]) ) {
+                c = set_bit(c, masks_16[j]);
+            }
+            j++;
+        } else {
+            while(powerOfTwo(i)) {
+                i++;
+            }
+            if (get_mask(*codeWord, masks_16[i])) {
+                c = set_bit(c, masks_16[j]);
+            }
+            j++;
+        }
+        
+    }
+    return c;
 }
 
 static void error_reporter(const struct dc_error *err) {
