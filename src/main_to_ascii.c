@@ -96,7 +96,7 @@ static void trace_reporter(const struct dc_posix_env *env,
                           const char *file_name,
                           const char *function_name,
                           size_t line_number);
-char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord);
+char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
 
 
 
@@ -261,7 +261,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // decode codeWords
     char decoded[8] = ""; 
     for (size_t i = 0; i < 8; i++) {
-        char c = decodeCodeWord(env, err, codeWords+i);
+        char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
         decoded[i] = c;
     }
 
@@ -271,26 +271,49 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     return ret_val;
 }
 
-char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord) {
+char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity) {
     char c = '\0';
+    size_t parityCount;
+    size_t j;
+    size_t k;
+
     // TODO: parity check and error correction
+    for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
+        parityCount = 0;
+        j = i;
+        while ( j < pow(2,4)) {
+            k = 0;
+            while ( k < i ) {
+                if ( get_mask(*codeWord, masks_16[j++])) {
+                    parityCount++;
+                }
+                k++;
+            }
+            j += i;
+        }
+
+        if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
+            printf("error detected\n");
+        }
+    }
+
 
     // Break apart codeWord into data word
-    size_t j = 0;
+    size_t l = 0;
     for (size_t i = 0; i < 12; ++i) {
         if (!powerOfTwo(i)) {
             if( get_mask(*codeWord, masks_16[i]) ) {
-                c = set_bit(c, masks_16[j]);
+                c = set_bit(c, masks_16[l]);
             }
-            j++;
+            l++;
         } else {
             while(powerOfTwo(i)) {
                 i++;
             }
             if (get_mask(*codeWord, masks_16[i])) {
-                c = set_bit(c, masks_16[j]);
+                c = set_bit(c, masks_16[l]);
             }
-            j++;
+            l++;
         }
         
     }
