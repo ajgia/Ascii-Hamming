@@ -235,7 +235,10 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
 
     for (size_t i = 0; i < 12; i++) {
         fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
-
+        // Catch bad open
+        if (fd == -1) {
+            return -1;
+        }
         // TODO: be able to handle more than 1 byte
         if (dc_error_has_no_error(err)) {
             char* chars = calloc(BUF_SIZE, 1024);
@@ -276,6 +279,8 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     size_t parityCount;
     size_t j;
     size_t k;
+    uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
+    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
 
     // TODO: parity check and error correction
     for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
@@ -293,11 +298,20 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
         }
 
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
-            printf("error detected\n");
+            // we have an error in this parity check
+            printf("z");
+            size_t cBit = log(i)/log(2);
+            *errorLocation = set_bit(*errorLocation, masks_16[cBit]);
         }
     }
 
+    dc_write(env, err, STDOUT_FILENO, "errLoc:", 7);
+    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
+    // we can't detect bit 0 error
+    if (*errorLocation) {
 
+    }
+    
     // Break apart codeWord into data word
     size_t l = 0;
     for (size_t i = 0; i < 12; ++i) {
@@ -317,6 +331,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
         }
         
     }
+    free(par);
     return c;
 }
 
@@ -330,4 +345,5 @@ static void trace_reporter(__attribute__((unused))  const struct dc_posix_env *e
                                                     const char *function_name,
                                                     size_t line_number) {
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
+
 }
