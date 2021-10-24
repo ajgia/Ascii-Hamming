@@ -162,7 +162,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_options_set_string,
                     "prefix",
                     required_argument,
-                    'r',
+                    'f',
                     "PREFIX",
                     dc_string_from_string,
                     "prefix",
@@ -280,7 +280,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     size_t j;
     size_t k;
     uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
-    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
+    // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
 
     // TODO: parity check and error correction
     for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
@@ -289,34 +289,34 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
         while ( j < pow(2,4)) {
             k = 0;
             while ( k < i ) {
-                if ( get_mask(*codeWord, masks_16[j++])) {
+                if ( get_mask(*codeWord, masks_16[j-1])) {
                     parityCount++;
                 }
-                k++;
+                ++j;
+                ++k;
             }
             j += i;
         }
 
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             // we have an error in this parity check
-            printf("z");
-            size_t cBit = log(i)/log(2);
+            uint8_t cBit = log(i)/log(2);
             *errorLocation = set_bit(*errorLocation, masks_16[cBit]);
         }
     }
 
-    dc_write(env, err, STDOUT_FILENO, "errLoc:", 7);
+    // dc_write(env, err, STDOUT_FILENO, "e", 1);
     dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
-    // we can't detect bit 0 error
     if (*errorLocation) {
-
+        // toggle error-location'th bit
+        *codeWord ^= masks_16[*errorLocation - 1];
     }
     
     // Break apart codeWord into data word
     size_t l = 0;
-    for (size_t i = 0; i < 12; ++i) {
+    for (size_t i = 1; i <= 12; ++i) {
         if (!powerOfTwo(i)) {
-            if( get_mask(*codeWord, masks_16[i]) ) {
+            if( get_mask(*codeWord, masks_16[i-1]) ) {
                 c = set_bit(c, masks_16[l]);
             }
             l++;
@@ -324,14 +324,14 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
             while(powerOfTwo(i)) {
                 i++;
             }
-            if (get_mask(*codeWord, masks_16[i])) {
+            if (get_mask(*codeWord, masks_16[i-1])) {
                 c = set_bit(c, masks_16[l]);
             }
             l++;
         }
         
     }
-    free(par);
+    free(errorLocation);
     return c;
 }
 

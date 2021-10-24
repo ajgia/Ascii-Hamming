@@ -161,7 +161,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_options_set_string,
                     "prefix",
                     required_argument,
-                    'r',
+                    'f',
                     "PREFIX",
                     dc_string_from_string,
                     "prefix",
@@ -247,6 +247,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 //  dest[i] = (uint16_t)'h';
 
                 copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
+
                 setParityBits(env, err, isEvenParity, (dest + i));
             }
 
@@ -292,7 +293,7 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
     // Loops through data word
     size_t i = 0;
     // Loops through 16 bit destination
-    size_t j = 0;
+    size_t j = 1;
 
     // Statements for debugging masks
     // display("source");
@@ -312,7 +313,7 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
         // If not power of two, set bit to 1 if bit should be 1. (Remember all this memory is zeroed out, so we'll just do nothing if its not a 1)
         if (!powerOfTwo(j)) {
             if ( get_mask(c, masks_16[i])) {
-                *dest = set_bit(*dest, masks_16[j]);
+                *dest = set_bit(*dest, masks_16[j-1]);
             }
             // Increment j either way
             ++j;
@@ -322,7 +323,7 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
                 ++j;
             }
             if ( get_mask(c, masks_16[i])) {
-                *dest = set_bit(*dest, masks_16[j]);
+                *dest = set_bit(*dest, masks_16[j-1]);
             }
             ++j;
         }
@@ -343,15 +344,17 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
     size_t j;
     size_t k;
 
-    for (size_t i = pow(2,0); i < pow(2,4); i <<= 1 ) {
+    for (size_t i = pow(2,0); i <= pow(2,4); i <<= 1 ) {
         parityCount = 0;
         j = i;
-        while ( j < pow(2,4) ) {
+        while ( j <= pow(2,4) ) {
             k = 0;
             while (k < i) {
-                if ( get_mask(*dest, masks_16[j++]) )
+                if ( get_mask(*dest, masks_16[j-1]) ) {
                     parityCount++;
-                k++;
+                }
+                ++j;
+                ++k;
             }
             j += i;
         }
@@ -361,7 +364,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
 
         // at end of for loop, set parity per bit depending on count
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
-            *dest = set_bit(*dest, masks_16[i]);
+            *dest = set_bit(*dest, masks_16[i-1]);
         }
     }
 }
@@ -397,7 +400,8 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
         // char c = i + '0';
         // printf("%c", c);
         dc_write(env, err, STDOUT_FILENO, &byteToWrite, 1);
-        dc_write(env, err, fd, &byteToWrite, 1);
+            dc_write(env, err, fd, &byteToWrite, 1);
+
         if (dc_error_has_error(err)) {
             error_reporter(err);
         }
