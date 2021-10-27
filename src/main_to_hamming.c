@@ -20,13 +20,15 @@
 #include <dc_posix/dc_stdlib.h>
 #include <dc_posix/dc_string.h>
 #include <dc_posix/dc_fcntl.h>
-#include <dc_posix/dc_unistd.h>
 #include <dc_util/bits.h>
 #include <dc_util/dump.h>
 #include <dc_util/types.h>
 
 #define BUF_SIZE 1024
 
+/**
+ * Bit masks
+ */ 
 const uint16_t MASK_00000000_00000001 = UINT16_C(0x00000001);
 const uint16_t MASK_00000000_00000010 = UINT16_C(0x00000002);
 const uint16_t MASK_00000000_00000100 = UINT16_C(0x00000004);
@@ -44,6 +46,9 @@ const uint16_t MASK_00100000_00000000 = UINT16_C(0x00002000);
 const uint16_t MASK_01000000_00000000 = UINT16_C(0x00004000);
 const uint16_t MASK_10000000_00000000 = UINT16_C(0x00008000);
 
+/**
+ * Bit mask array
+ */ 
 static const uint16_t masks_16[] = {
     MASK_00000000_00000001,
     MASK_00000000_00000010,
@@ -63,6 +68,9 @@ static const uint16_t masks_16[] = {
     MASK_10000000_00000000
 };
 
+/**
+ * DC Application settings
+ */ 
 struct application_settings
 {
     struct dc_opt_settings opts;
@@ -70,32 +78,59 @@ struct application_settings
     struct dc_setting_string *prefix;
 };
 
+/**
+ * Create DC Application settings
+ */ 
 static struct dc_application_settings *create_settings( const struct dc_posix_env *env,
                                                         struct dc_error *err);
-
+/**
+ * Destroy DC application settings
+ */ 
 static int destroy_settings(const struct dc_posix_env *env,
                             struct dc_error *err,
                             struct dc_application_settings **psettings);
+/**
+ * Convert ascii to hamming
+ */ 
 static int run( const struct dc_posix_env *env,
                 struct dc_error *err,
                 struct dc_application_settings *settings);
+/**
+ * Error reporter
+ */ 
 static void error_reporter(const struct dc_error *err);
+/**
+ * Trace reporter
+ */ 
 static void trace_reporter(const struct dc_posix_env *env,
                           const char *file_name,
                           const char *function_name,
                           size_t line_number);
+
+/**
+ * Create hamming word
+ */ 
 void createHammingWord( const struct dc_posix_env *env,
                         const struct dc_error *err, 
                         char, 
                         bool*);
+/**
+ * Set parity bits
+ */ 
 void setParityBits( const struct dc_posix_env *env,
                         const struct dc_error *err,
                         bool isEvenParity,
                         uint16_t * dest);  
+/**
+ * Copy 8 bit into 16 bit hamming format
+ */ 
 void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
                                             const struct dc_error *err, 
                                             const uint8_t,
                                             uint16_t * dest);
+/**
+ * Write hamming to the 12 files
+ */ 
 void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
 
@@ -214,15 +249,11 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     DC_TRACE(env);
     ret_val = 0;
 
-    // Create settings
+    // Create and get settings
     app_settings = (struct application_settings *)settings;
-    // Get settings
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-
-    // Process parity argument
     isEvenParity = isEvenParitySetting(parity);
-    // printf("evenParity: %d\n", isEvenParity);
 
 
     if (dc_error_has_no_error(err)) {
@@ -233,47 +264,21 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 ret_val = 1;
             }
 
-            // These initialization statements are good. They do result in zeroed out memory of the appropriate size
-            uint16_t * arr = (uint16_t*)calloc(nread, sizeof(uint16_t));
             uint16_t * dest = (uint16_t*)calloc(nread, sizeof(uint16_t));
-
-            // display("dc_writes:");
-            // dc_write(env, err, STDOUT_FILENO, arr, (nread * 2 ));
-            // dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
 
             // Loop to process each char of line
             for(size_t i = 0; i < nread; i++) {
-                 arr[i] = (uint16_t) chars[i];
-                //  dest[i] = (uint16_t)'h';
-
                 copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
-
                 setParityBits(env, err, isEvenParity, (dest + i));
             }
 
-            if(dc_error_has_error(err))
-            {
-                display("Error: word is made");
-            }
-
             // display line("dc_writes:");
-            dc_write(env, err, STDOUT_FILENO, arr, (nread * 2 ));
+            dc_write(env, err, STDOUT_FILENO, chars, (nread * 2 ));
             dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
-            if(dc_error_has_error(err))
-            {
-                display("Error: dc_writes made");
-            }
 
             // Write *dest to files 1 through 12
             writeToFiles(env, err, dest, (size_t)nread, prefix);
-            // if(dc_error_has_error(err))
-            // {
-            //     display("Error: write to files done");
-            // }
-            if(dc_error_has_error(err)) 
-                ret_val = 2;
 
-            free(arr);
             free(dest);
         }
 
@@ -290,26 +295,13 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
  * DOES NOT SET THE PARITY BITS
  */ 
 void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const struct dc_error *err, const uint8_t c, uint16_t * dest) {
-    // Loops through data word
+    // Counter for data word
     size_t i = 0;
-    // Loops through 16 bit destination
+    // Counter for 16 bit destination
     size_t j = 1;
-
-    // Statements for debugging masks
-    // display("source");
-    // for (int i = 0; i < 8; i++) {
-    //     print_mask(c, masks_16[i]);
-    // }
-    //     *dest = set_bit(*dest, masks_16[0]);
-    //     display("dest");
-    // for (int i = 0; i < 16; i++) {
-    //     print_mask(*dest, masks_16[i]);
-    // }
-
 
     // Loop through data word
     for (i = 0; i < 8; i++) {
-        // print_mask(flipped, masks_16[i]);
         // If not power of two, set bit to 1 if bit should be 1. (Remember all this memory is zeroed out, so we'll just do nothing if its not a 1)
         if (!powerOfTwo(j)) {
             if ( get_mask(c, masks_16[i])) {
@@ -362,7 +354,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
         // printf("parityCount: %d\n", parityCount);
         // printf("is even: %d\n",isEven(parityCount));
 
-        // at end of for loop, set parity per bit depending on count
+        // at end of each parity bit check, set parity per bit depending on count
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             *dest = set_bit(*dest, masks_16[i-1]);
         }
@@ -379,7 +371,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
         error_reporter(err);
     }
 
-    // Open write and close each file in this loop
+    // Open, write and close each file in this loop
     for (size_t i = 0; i < 12; i++) {
         fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_CREAT | DC_O_TRUNC | DC_O_WRONLY, S_IRUSR | S_IWUSR);
         if (dc_error_has_error(err)) {
@@ -406,7 +398,8 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
             error_reporter(err);
         }
 
-        dc_close(env, err, fd);
+        close(fd);
+        // dc_close(env, err, fd);
     }
     destroyArray(pathArr);
 }

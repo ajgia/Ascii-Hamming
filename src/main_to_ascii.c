@@ -31,7 +31,6 @@
 #include <dc_posix/dc_stdlib.h>
 #include <dc_posix/dc_string.h>
 #include <dc_posix/dc_fcntl.h>
-#include <dc_posix/dc_unistd.h>
 #include <dc_util/bits.h>
 #include <dc_util/dump.h>
 #include <dc_util/types.h>
@@ -39,6 +38,9 @@
 #define BUF_SIZE 1024
 
 
+/**
+ * Bit masks
+ */ 
 const uint16_t MASK_00000000_00000001 = UINT16_C(0x00000001);
 const uint16_t MASK_00000000_00000010 = UINT16_C(0x00000002);
 const uint16_t MASK_00000000_00000100 = UINT16_C(0x00000004);
@@ -56,6 +58,9 @@ const uint16_t MASK_00100000_00000000 = UINT16_C(0x00002000);
 const uint16_t MASK_01000000_00000000 = UINT16_C(0x00004000);
 const uint16_t MASK_10000000_00000000 = UINT16_C(0x00008000);
 
+/**
+ * Bit mask array
+ */ 
 static const uint16_t masks_16[] = {
     MASK_00000000_00000001,
     MASK_00000000_00000010,
@@ -75,6 +80,10 @@ static const uint16_t masks_16[] = {
     MASK_10000000_00000000
 };
 
+/**
+ * DC Application Settings
+ * Has default options, plus settings for bit parity and file prefix.
+ */ 
 struct application_settings
 {
     struct dc_opt_settings opts;
@@ -82,24 +91,45 @@ struct application_settings
     struct dc_setting_string *prefix;
 };
 
+/**
+ * Create DC Application settings
+ */ 
 static struct dc_application_settings *create_settings( const struct dc_posix_env *env,
                                                         struct dc_error *err);
 
+/**
+ * Destroy DC Application settings
+ */ 
 static int destroy_settings(const struct dc_posix_env *env,
                             struct dc_error *err,
                             struct dc_application_settings **psettings);
-static int run( const struct dc_posix_env *env,
-                struct dc_error *err,
-                struct dc_application_settings *settings);
+/**
+ * Error reporter
+ */ 
 static void error_reporter(const struct dc_error *err);
+/**
+ * Trace reporter
+ */ 
 static void trace_reporter(const struct dc_posix_env *env,
                           const char *file_name,
                           const char *function_name,
                           size_t line_number);
+
+/**
+ * Translate to ASCII
+ */ 
+static int run( const struct dc_posix_env *env,
+                struct dc_error *err,
+                struct dc_application_settings *settings);
+/**
+ * Decode a code word
+ */ 
 char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
 
 
-
+/**
+ * Main
+ */ 
 int main(int argc, char * argv[]) {
     dc_posix_tracer tracer;
     dc_error_reporter reporter;
@@ -218,27 +248,27 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     DC_TRACE(env);
     ret_val = 0;
 
-    // Create settings
+    // Create and get settings
     app_settings = (struct application_settings *)settings;
-    // Get settings
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
     isEvenParity = isEvenParitySetting(parity);
    
-    if (dc_error_has_error(err)) {
-        display("setup error");
-        error_reporter(err);
-    }
-    
+    // File path array
     pathArr = constructFilePathArray(env, err, prefix);
+    // Holds each decoded code word
     codeWords = (uint16_t*)calloc(8, sizeof(uint16_t));
 
+
+    // Loop over input files
     for (size_t i = 0; i < 12; i++) {
         fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
+
         // Catch bad open
         if (fd == -1) {
             return -1;
         }
+
         // TODO: be able to handle more than 1 byte
         if (dc_error_has_no_error(err)) {
             char* chars = calloc(BUF_SIZE, 1024);
@@ -257,7 +287,9 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
             free(chars);
         }
         else {error_reporter(err);}
-        
+
+        close(fd);
+        // dc_close(env, err, fd);
     }
     // dc_write(env, err, STDOUT_FILENO, codeWords, 8*sizeof(uint16_t));
     
@@ -282,7 +314,6 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
     // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
 
-    // TODO: parity check and error correction
     for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
         parityCount = 0;
         j = i;

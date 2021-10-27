@@ -17,11 +17,9 @@ set(COMMON_SOURCE_LIST
         )
 
 set(TO_HAMMING_SOURCE_LIST
-
         )
 
 set(TO_ASCII_SOURCE_LIST
-
         )
 
 set(TO_HAMMING_MAIN_SOURCE
@@ -29,8 +27,8 @@ set(TO_HAMMING_MAIN_SOURCE
         )
 
 set(TO_ASCII_MAIN_SOURCE
-		"${assign2_SOURCE_DIR}/src/main_to_ascii.c"
-		)
+        "${assign2_SOURCE_DIR}/src/main_to_ascii.c"
+        )
 
 ### Require out-of-source builds
 # this still creates a CMakeFiles directory and CMakeCache.txt- can we delete them?
