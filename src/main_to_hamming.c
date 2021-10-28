@@ -256,7 +256,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     if (dc_error_has_no_error(err)) {
         // Read from stdin
         while((nread = dc_read(env, err, STDIN_FILENO, chars, BUF_SIZE)) > 0) {
-            // printf("nread: %d\n", nread);
+
             if(dc_error_has_error(err)) {
                 ret_val = 1;
             }
@@ -268,10 +268,6 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
                 setParityBits(env, err, isEvenParity, (dest + i));
             }
-
-            // display line("dc_writes:");
-            // dc_write(env, err, STDOUT_FILENO, chars, nread);
-            // dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
 
             // Write *dest to files 1 through 12
             writeToFiles(env, err, dest, (size_t)nread, prefix);
@@ -322,12 +318,13 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
 /**
  * Takes a pointer to a "Hamming-formatted" Uint16 that does not have parity bits set yet, and sets them.
  * Hamming-format: DPPD PDDD PDDD 0000  , where D = Data bit, P = parity bit, 0 = padding
+ * For each 2^n parity bit for n in [0, 3] .... (2^0, 2^1, 2^2, 2^3)
+ *      1. Calculate parity by checking bits starting at 2^nth bit, then skip 2^n bits, check 2^n bits, etc.
+ *         a) for each bit check, get masked version at bit position and add result to a count
+ *         b) result of count (whether count is even or odd) is the bit parity
+ *      2. Set parity of 2^n bit depending on even or odd parity
  */
-    // For each 2^n parity bit for n in [0, 3] .... (2^0, 2^1, 2^2, 2^3)
-    // 1. Calculate parity by checking bits starting at 2^nth bit, then skip 2^n bits, check 2^n bits, etc.
-    //      a) for each bit check, get masked version at bit position and add result to a count
-    //        b) result of count (whether count is even or odd) is the bit parity
-    // 2. Set parity of 2^n bit depending on even or odd parity
+
 void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, bool isEvenParity, uint16_t *dest) {
     size_t parityCount;
     size_t j;
@@ -348,10 +345,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
             j += i;
         }
 
-        // printf("parityCount: %d\n", parityCount);
-        // printf("is even: %d\n",isEven(parityCount));
-
-        // at end of each parity bit check, set parity per bit depending on count
+        // End of each parity bit check, set parity per bit depending on count
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             *dest = set_bit(*dest, masks_16[i-1]);
         }
@@ -369,7 +363,6 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
     size_t k = 0;
     
     
-
     if (dc_error_has_error(err)) {
         error_reporter(err);
     }
@@ -392,6 +385,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
 
         l = 0;
         k = 0;
+
         // Generate bytes to write per file
         for(size_t j = 0; j < numCodeWords; j++) {
             if ( l == 8) {
@@ -402,14 +396,13 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
             // check the i'th bit of each code word
             if ( get_mask((*(sourcePtr+j)), masks_16[i]) ) {
                 // set byte's j'th bit for code-word i'th bit
-                // byteToWrite = set_bit8(byteToWrite, masks_16[j]);
                 *(bytesToWrite+k) = set_bit8(*(bytesToWrite+k), masks_16[l]);
             }
             ++l;
             
         }
 
-        dc_write(env, err, STDOUT_FILENO, bytesToWrite, numBytesToWrite);
+        // dc_write(env, err, STDOUT_FILENO, bytesToWrite, numBytesToWrite);
         dc_write(env, err, fd, bytesToWrite, numBytesToWrite);
 
         if (dc_error_has_error(err)) {

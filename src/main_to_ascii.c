@@ -244,6 +244,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     int ret_val;
     bool isEvenParity;
     int fd;
+    size_t maxRead;
     
     DC_TRACE(env);
     ret_val = 0;
@@ -259,9 +260,10 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // Holds each decoded code word
     codeWords = (uint16_t*)calloc(BUF_SIZE, sizeof(uint16_t));
 
-    size_t maxRead = 0;
+    maxRead = 0;
     // Loop over input files
     for (size_t i = 0; i < 12; i++) {
+
         // fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
         fd = open((pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
 
@@ -284,12 +286,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                     
                         }
                     }
-
                 }
-
-
-                // dc_write(env, err, STDOUT_FILENO, chars, (size_t)nread);
-
 
                 // store nread
                 if (maxRead < nread)
@@ -306,10 +303,8 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     }
     
     size_t numCodeWords = maxRead *8;
-    // dc_write(env, err, STDOUT_FILENO, codeWords, numCodeWords * sizeof(uint16_t));
     
     // decode codeWords
-    // char decoded[ 8] = ""; 
     char *decoded = (char*)calloc(numCodeWords, sizeof(char));
 
     for (size_t i = 0; i < numCodeWords; i++) {
