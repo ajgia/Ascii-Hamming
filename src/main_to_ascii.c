@@ -197,7 +197,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "abc"}
+                    "code"}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -257,52 +257,70 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // File path array
     pathArr = constructFilePathArray(env, err, prefix);
     // Holds each decoded code word
-    codeWords = (uint16_t*)calloc(8, sizeof(uint16_t));
+    codeWords = (uint16_t*)calloc(BUF_SIZE, sizeof(uint16_t));
 
-
+    size_t maxRead = 0;
     // Loop over input files
     for (size_t i = 0; i < 12; i++) {
-        fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
+        // fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
+        fd = open((pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
 
         // Catch bad open
         if (fd == -1) {
             return -1;
         }
 
-        // TODO: be able to handle more than 1 byte
         if (dc_error_has_no_error(err)) {
             char* chars = calloc(BUF_SIZE, 1024);
             while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
-                for (size_t j = 0; j < 8; j++) {
-                    if (get_mask(*chars, masks_16[j])) {
-                        *(codeWords+j) = set_bit(*(codeWords+j), masks_16[i]);
+
+                // loop through bytes
+                for (size_t k = 0; k < nread; k++) {
                     
+                    // loop through bits in byte
+                    for (size_t l = 0; l < 8; l++) {
+                        if (get_mask(*(chars+k), masks_16[l])) {
+                            *(codeWords+l+8*k) = set_bit(*(codeWords+l+8*k), masks_16[i]);
+                    
+                        }
                     }
+
                 }
 
 
                 // dc_write(env, err, STDOUT_FILENO, chars, (size_t)nread);
 
+
+                // store nread
+                if (maxRead < nread)
+                    maxRead = nread;
             }
             free(chars);
         }
-        else {error_reporter(err);}
+        else { 
+            error_reporter(err); 
+        }
 
         close(fd);
         // dc_close(env, err, fd);
     }
-    // dc_write(env, err, STDOUT_FILENO, codeWords, 8*sizeof(uint16_t));
+    
+    size_t numCodeWords = maxRead *8;
+    // dc_write(env, err, STDOUT_FILENO, codeWords, numCodeWords * sizeof(uint16_t));
     
     // decode codeWords
-    char decoded[8] = ""; 
-    for (size_t i = 0; i < 8; i++) {
+    // char decoded[ 8] = ""; 
+    char *decoded = (char*)calloc(numCodeWords, sizeof(char));
+
+    for (size_t i = 0; i < numCodeWords; i++) {
         char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
         decoded[i] = c;
     }
 
-    dc_write(env, err, STDOUT_FILENO, decoded, 8);
+    dc_write(env, err, STDOUT_FILENO, decoded, numCodeWords);
 
     free(codeWords);
+    free(decoded);
     return ret_val;
 }
 

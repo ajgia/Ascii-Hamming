@@ -20,6 +20,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <dc_posix/dc_unistd.h>
+#include <ctype.h>
+
 #define BUF_SIZE 1024
 
 int display(const char *str)
@@ -84,14 +86,20 @@ bool isEven(size_t x) {
 }
 
 // Return 1 (true) for even, 0 for odd
-// TODO: use dc_strncmp
 bool isEvenParitySetting(const char * parity) {
-    if (strcmp(parity, "odd") == 0)
+    // Get lowercase
+    char *arg = parity;
+    for (size_t i = 0; *(arg+i); ++i) {
+        *(arg+i) = tolower(*(arg+i));
+    }
+
+    if (strcmp(arg, "odd") == 0)
         return false;
-    else if (strcmp(parity, "even") == 0)
+    else if (strcmp(arg, "even") == 0)
         return true;
-    // Default case, default to even
+    // Default case, default to even and display warning
     else {
+        display("Warning: please enter only \"even\" or \"odd\" for the parity argument. Defaulting to even.");
         return true;
     }
 }

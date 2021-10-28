@@ -90,7 +90,7 @@ static int destroy_settings(const struct dc_posix_env *env,
                             struct dc_error *err,
                             struct dc_application_settings **psettings);
 /**
- * Convert ascii to hamming
+ * Convert ascii input to hamming files
  */ 
 static int run( const struct dc_posix_env *env,
                 struct dc_error *err,
@@ -107,13 +107,7 @@ static void trace_reporter(const struct dc_posix_env *env,
                           const char *function_name,
                           size_t line_number);
 
-/**
- * Create hamming word
- */ 
-void createHammingWord( const struct dc_posix_env *env,
-                        const struct dc_error *err, 
-                        char, 
-                        bool*);
+
 /**
  * Set parity bits
  */ 
@@ -122,14 +116,15 @@ void setParityBits( const struct dc_posix_env *env,
                         bool isEvenParity,
                         uint16_t * dest);  
 /**
- * Copy 8 bit into 16 bit hamming format
+ * Copy 8 bit char into 12 bit hamming format documented in darcy_design.txt
+ * Parity bits are not set here.
  */ 
 void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
                                             const struct dc_error *err, 
                                             const uint8_t,
                                             uint16_t * dest);
 /**
- * Write hamming to the 12 files
+ * Write hamming codeword to the 12 files, 1 bit of each word per file.
  */ 
 void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
@@ -203,7 +198,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "abc"}
+                    "code"}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -275,8 +270,8 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
             }
 
             // display line("dc_writes:");
-            dc_write(env, err, STDOUT_FILENO, chars, (nread * 2 ));
-            dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
+            // dc_write(env, err, STDOUT_FILENO, chars, nread);
+            // dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
 
             // Write *dest to files 1 through 12
             writeToFiles(env, err, dest, (size_t)nread, prefix);
@@ -367,6 +362,12 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
     char* pathArr;
     int fd;
     pathArr = constructFilePathArray(env, err, prefix);
+
+    // Bit counter
+    size_t l = 0;
+    // Byte counter
+    size_t k = 0;
+    
     
 
     if (dc_error_has_error(err)) {
@@ -375,32 +376,48 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
 
     // Open, write and close each file in this loop
     for (size_t i = 0; i < 12; i++) {
+
+
         fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_CREAT | DC_O_TRUNC | DC_O_WRONLY, S_IRUSR | S_IWUSR);
         if (dc_error_has_error(err)) {
             error_reporter(err);
         }
 
-        // TODO: start here. make this a pointer to the appropriate amount of bytes 
-        char byteToWrite = '\0';
+        // Calculate number of bytes to write from number of code words
+        size_t numBytesToWrite = numCodeWords/8;
+        if ( (numCodeWords%8) != 0 )
+            ++numBytesToWrite;
 
-        // Generate byte to write per file
-        // TODO: if numCodeWords > 8, do something 
+        uint8_t *bytesToWrite = (uint8_t*)calloc(numBytesToWrite, sizeof(uint8_t));
+
+        l = 0;
+        k = 0;
+        // Generate bytes to write per file
         for(size_t j = 0; j < numCodeWords; j++) {
+            if ( l == 8) {
+                l = 0;
+                ++k;
+            }
+                
             // check the i'th bit of each code word
-            if ( get_mask((*(sourcePtr+j)), masks_16[i]) )
+            if ( get_mask((*(sourcePtr+j)), masks_16[i]) ) {
                 // set byte's j'th bit for code-word i'th bit
-                byteToWrite = set_bit8(byteToWrite, masks_16[j]);
+                // byteToWrite = set_bit8(byteToWrite, masks_16[j]);
+                *(bytesToWrite+k) = set_bit8(*(bytesToWrite+k), masks_16[l]);
+            }
+            ++l;
+            
         }
-        // char c = i + '0';
-        // printf("%c", c);
-        dc_write(env, err, STDOUT_FILENO, &byteToWrite, 1);
-            dc_write(env, err, fd, &byteToWrite, 1);
+
+        dc_write(env, err, STDOUT_FILENO, bytesToWrite, numBytesToWrite);
+        dc_write(env, err, fd, bytesToWrite, numBytesToWrite);
 
         if (dc_error_has_error(err)) {
             error_reporter(err);
         }
 
         close(fd);
+        free(bytesToWrite);
         // dc_close(env, err, fd);
     }
     destroyArray(pathArr);
