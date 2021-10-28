@@ -133,7 +133,9 @@ void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
  */ 
 void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
-
+/**
+ * Main
+ */ 
 int main(int argc, char * argv[]) {
     dc_posix_tracer tracer;
     dc_error_reporter reporter;
