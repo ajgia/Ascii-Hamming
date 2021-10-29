@@ -55,7 +55,7 @@ uint16_t get_mask(uint16_t byte, uint16_t  mask) {
     return masked;
 }
 
-uint8_t get_mask8(uint8_t byte, uint8_t mask) {
+uint8_t get_mask8(uint8_t byte, uint16_t mask) {
     uint8_t masked;
     masked = byte & mask;
     return masked;
@@ -86,11 +86,11 @@ bool isEven(size_t x) {
 }
 
 // Return 1 (true) for even, 0 for odd
-bool isEvenParitySetting(const char * parity) {
+bool isEvenParitySetting(char * parity) {
     // Get lowercase
     char *arg = parity;
     for (size_t i = 0; *(arg+i); ++i) {
-        *(arg+i) = tolower(*(arg+i));
+        *(arg+i) = (char)tolower(*(arg+i));
     }
 
     if (strcmp(arg, "odd") == 0)
@@ -129,7 +129,7 @@ char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_err
         
         // Number append
         char buffer[10];
-        snprintf(buffer, 10, "%d", i);
+        snprintf(buffer, 10, "%zu", i);
         strncat(path, buffer, strlen(buffer));
 
         strncat(path, ext, strlen(ext));

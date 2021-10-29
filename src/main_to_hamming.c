@@ -126,7 +126,7 @@ void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
 /**
  * Write hamming codeword to the 12 files, 1 bit of each word per file.
  */ 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
 /**
  * Main
@@ -238,7 +238,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     const char *parity;
     const char *prefix;
 
-    char chars[BUF_SIZE];
+    uint8_t chars[BUF_SIZE];
     ssize_t nread;
     int ret_val;
     bool isEvenParity;
@@ -261,10 +261,10 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 ret_val = 1;
             }
 
-            uint16_t * dest = (uint16_t*)calloc(nread, sizeof(uint16_t));
+            uint16_t * dest = (uint16_t*)calloc((size_t)nread, sizeof(uint16_t));
 
             // Loop to process each char of line
-            for(size_t i = 0; i < nread; i++) {
+            for(size_t i = 0; i < (size_t)nread; i++) {
                 copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
                 setParityBits(env, err, isEvenParity, (dest + i));
             }
@@ -324,7 +324,6 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
  *         b) result of count (whether count is even or odd) is the bit parity
  *      2. Set parity of 2^n bit depending on even or odd parity
  */
-
 void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, bool isEvenParity, uint16_t *dest) {
     size_t parityCount;
     size_t j;
@@ -352,7 +351,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
     }
 }
 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
     char* pathArr;
     int fd;
     pathArr = constructFilePathArray(env, err, prefix);
@@ -411,7 +410,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
 
         close(fd);
         free(bytesToWrite);
-        // dc_close(env, err, fd);
+
     }
     destroyArray(pathArr);
 }
