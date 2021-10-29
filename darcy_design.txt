@@ -1,5 +1,5 @@
 Alex Giasson A00982145
-Assignment 2 Hamming-to-ASCII Documentation
+Assignment 2 Hamming-to-ASCII Design Documentation
 
 Programs:
 main_to_hamming - Translates ASCII input to Hamming code

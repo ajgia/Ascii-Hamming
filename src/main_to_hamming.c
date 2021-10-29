@@ -109,7 +109,11 @@ static void trace_reporter(const struct dc_posix_env *env,
 
 
 /**
- * Set parity bits
+ * Set parity bits of a uint16_t
+ * @param env dc_env
+ * @param err dc_err
+ * @param isEvenParity boolean for parity
+ * @param dest uint16_t pointer to destination to modify
  */ 
 void setParityBits( const struct dc_posix_env *env,
                         const struct dc_error *err,
@@ -118,15 +122,24 @@ void setParityBits( const struct dc_posix_env *env,
 /**
  * Copy 8 bit char into 12 bit hamming format documented in darcy_design.txt
  * Parity bits are not set here.
+ * @param env dc_env
+ * @param err dc_err
+ * @param input uint8_t input
+ * @param dest uint16_t destination for hamming code format
  */ 
 void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
                                             const struct dc_error *err, 
-                                            const uint8_t,
+                                            const uint8_t input,
                                             uint16_t * dest);
 /**
  * Write hamming codeword to the 12 files, 1 bit of each word per file.
+ * @param env dc_env
+ * @param err dc_err
+ * @param sourcePtr pointer to uint16_t memory block of input data
+ * @param numCodeWords number of code words to write to files
+ * @param prefix prefix argument used to generate file names
  */ 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
 /**
  * Main
@@ -261,17 +274,13 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 ret_val = 1;
             }
 
-            uint16_t * dest = (uint16_t*)calloc(nread, sizeof(uint16_t));
+            uint16_t * dest = (uint16_t*)calloc((size_t)nread, sizeof(uint16_t));
 
             // Loop to process each char of line
-            for(size_t i = 0; i < nread; i++) {
+            for(size_t i = 0; i < (size_t)nread; i++) {
                 copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
                 setParityBits(env, err, isEvenParity, (dest + i));
             }
-
-            // display line("dc_writes:");
-            // dc_write(env, err, STDOUT_FILENO, chars, nread);
-            // dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
 
             // Write *dest to files 1 through 12
             writeToFiles(env, err, dest, (size_t)nread, prefix);
@@ -358,7 +367,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
     }
 }
 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
     char* pathArr;
     int fd;
     pathArr = constructFilePathArray(env, err, prefix);

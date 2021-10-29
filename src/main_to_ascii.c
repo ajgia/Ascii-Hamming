@@ -116,13 +116,18 @@ static void trace_reporter(const struct dc_posix_env *env,
                           size_t line_number);
 
 /**
- * Translate to ASCII
+ * Translate Hamming to ASCII
  */ 
 static int run( const struct dc_posix_env *env,
                 struct dc_error *err,
                 struct dc_application_settings *settings);
 /**
- * Decode a code word
+ * Decode a Hamming Codeword and return the translated character.
+ * @param env dc_env
+ * @param er dc_err
+ * @param codeWord the codeword to decode
+ * @param isEvenParity the parity to use to decode the codeword
+ * @return the decoded character
  */ 
 char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
 
@@ -275,11 +280,11 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
             while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
 
                 // loop through bytes
-                for (size_t k = 0; k < nread; k++) {
+                for (size_t k = 0; k < (size_t)nread; k++) {
                     
                     // loop through bits in byte
                     for (size_t l = 0; l < 8; l++) {
-                        if (get_mask(*(chars+k), masks_16[l])) {
+                        if (get_mask8(*(chars+k), masks_16[l])) {
                             *(codeWords+l+8*k) = set_bit(*(codeWords+l+8*k), masks_16[i]);
                     
                         }
@@ -292,8 +297,8 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
 
 
                 // store nread
-                if (maxRead < nread)
-                    maxRead = nread;
+                if (maxRead < (size_t)nread)
+                    maxRead = (size_t)nread;
             }
             free(chars);
         }
@@ -349,8 +354,9 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
 
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             // we have an error in this parity check
-            uint8_t cBit = log(i)/log(2);
-            *errorLocation = set_bit(*errorLocation, masks_16[cBit]);
+            display("error detected");
+            uint8_t cBit = (uint8_t)(log(i)/log(2));
+            *errorLocation = set_bit8(*errorLocation, masks_16[cBit]);
         }
     }
 
@@ -366,7 +372,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     for (size_t i = 1; i <= 12; ++i) {
         if (!powerOfTwo(i)) {
             if( get_mask(*codeWord, masks_16[i-1]) ) {
-                c = set_bit(c, masks_16[l]);
+                c = set_bit8(c, masks_16[l]);
             }
             l++;
         } else {
@@ -374,7 +380,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
                 i++;
             }
             if (get_mask(*codeWord, masks_16[i-1])) {
-                c = set_bit(c, masks_16[l]);
+                c = set_bit8(c, masks_16[l]);
             }
             l++;
         }
@@ -396,3 +402,4 @@ static void trace_reporter(__attribute__((unused))  const struct dc_posix_env *e
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
 
 }
+
