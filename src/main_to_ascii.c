@@ -125,7 +125,14 @@ static int run( const struct dc_posix_env *env,
  * Decode a code word
  */ 
 char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
-
+/**
+ * Apply error correction by performing parity check.
+ */ 
+void errorCorrection(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
+/**
+ * Read the data in files in pathArr into an array of Hamming Codewords. Returns max bytes read from one of the files.
+ */
+ssize_t processFilesIntoCodewords(const struct dc_posix_env *env, struct dc_error *err, char *pathArr, uint16_t *codeWords);
 
 /**
  * Main
@@ -244,7 +251,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     int ret_val;
     bool isEvenParity;
     int fd;
-    size_t maxRead;
+    ssize_t maxRead;
     
     DC_TRACE(env);
     ret_val = 0;
@@ -255,25 +262,64 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     prefix = dc_setting_string_get(env, app_settings->prefix);
     isEvenParity = isEvenParitySetting(parity);
    
-    // File path array
+
+    // File path array creation
     pathArr = constructFilePathArray(env, err, prefix);
     // Holds each decoded code word
-    codeWords = (uint16_t*)calloc(BUF_SIZE, sizeof(uint16_t));
+    codeWords = (uint16_t*)calloc(BUF_SIZE*8, sizeof(uint16_t));
 
-    maxRead = 0;
+    // display("here");
+    // Process files
+    maxRead = processFilesIntoCodewords(env, err, pathArr, codeWords);
+    // printf("maxread: %zu", maxRead);
+    if (maxRead < 0) {
+        return -1;
+    }
+
+    
+    // dc_write(env, err, STDOUT_FILENO, codeWords, numCodeWords * 2);
+
+    // Calculate appropriate memory for decoded words
+    size_t numCodeWords = maxRead *8;
+    char *decoded = (char*)calloc(numCodeWords, sizeof(char));
+    
+
+    // Decode codeWords
+    for (size_t i = 0; i < numCodeWords; i++) {
+        char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
+        decoded[i] = c;
+    }
+
+    // Write decoded message
+    dc_write(env, err, STDOUT_FILENO, decoded, numCodeWords);
+
+    free(codeWords);
+    free(decoded);
+    return ret_val;
+}
+
+ssize_t processFilesIntoCodewords(const struct dc_posix_env *env, struct dc_error *err, char *pathArr, uint16_t *codeWords) {
+    int fd;
+    ssize_t nread;
+    size_t maxRead = 0;
+
     // Loop over input files
     for (size_t i = 0; i < 12; i++) {
 
-        // fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
-        fd = open((pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
+        fd = dc_open(env, err, (pathArr+(i*BUF_SIZE)), DC_O_RDONLY, DC_S_IRUSR);
 
         // Catch bad open
-        if (fd == -1) {
+        if (fd < 0 || dc_error_has_error(err)) {
+            printf("Error: could not open file %zu\n", i);
             return -1;
         }
 
         if (dc_error_has_no_error(err)) {
-            char* chars = calloc(BUF_SIZE, 1024);
+
+            // Allocate memory for reading in this file
+            uint8_t* chars = calloc(BUF_SIZE, sizeof(uint8_t));
+
+            // Read chars and process them into 12(16)-bit codewords
             while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
 
                 // loop through bytes
@@ -281,16 +327,16 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                     
                     // loop through bits in byte
                     for (size_t l = 0; l < 8; l++) {
-                        if (get_mask(*(chars+k), masks_16[l])) {
+                        if (get_mask8(*(chars+k), masks_16[l])) {
                             *(codeWords+l+8*k) = set_bit(*(codeWords+l+8*k), masks_16[i]);
                     
                         }
                     }
                 }
 
-                // store nread
-                if (maxRead < nread)
-                    maxRead = nread;
+                // store maximum bytes read
+                if (maxRead < (size_t)nread)
+                    maxRead = (size_t)nread;
             }
             free(chars);
         }
@@ -301,22 +347,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
         close(fd);
         // dc_close(env, err, fd);
     }
-    
-    size_t numCodeWords = maxRead *8;
-    
-    // decode codeWords
-    char *decoded = (char*)calloc(numCodeWords, sizeof(char));
-
-    for (size_t i = 0; i < numCodeWords; i++) {
-        char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
-        decoded[i] = c;
-    }
-
-    dc_write(env, err, STDOUT_FILENO, decoded, numCodeWords);
-
-    free(codeWords);
-    free(decoded);
-    return ret_val;
+    return maxRead;
 }
 
 char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity) {
@@ -324,9 +355,41 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     size_t parityCount;
     size_t j;
     size_t k;
-    uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
-    // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
 
+    // Apply error correction procedures
+    errorCorrection(env, err, codeWord, isEvenParity );
+
+
+    // Break apart codeWord into data word
+    size_t l = 0;
+    for (size_t i = 1; i <= 12; ++i) {
+        if (!powerOfTwo(i)) {
+            if( get_mask(*codeWord, masks_16[i-1]) ) {
+                c = set_bit(c, masks_16[l]);
+            }
+            l++;
+        } else {
+            while(powerOfTwo(i)) {
+                i++;
+            }
+            if (get_mask(*codeWord, masks_16[i-1])) {
+                c = set_bit(c, masks_16[l]);
+            }
+            l++;
+        }
+        
+    }
+
+    return c;
+}
+
+void errorCorrection(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity) {
+    size_t parityCount;
+    size_t j;
+    size_t k;
+    uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
+
+    // Parity check
     for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
         parityCount = 0;
         j = i;
@@ -349,34 +412,12 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
         }
     }
 
-    // dc_write(env, err, STDOUT_FILENO, "e", 1);
-    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
     if (*errorLocation) {
         // toggle error-location'th bit
+        display("Error detected: attempting correction.");
         *codeWord ^= masks_16[*errorLocation - 1];
     }
-    
-    // Break apart codeWord into data word
-    size_t l = 0;
-    for (size_t i = 1; i <= 12; ++i) {
-        if (!powerOfTwo(i)) {
-            if( get_mask(*codeWord, masks_16[i-1]) ) {
-                c = set_bit(c, masks_16[l]);
-            }
-            l++;
-        } else {
-            while(powerOfTwo(i)) {
-                i++;
-            }
-            if (get_mask(*codeWord, masks_16[i-1])) {
-                c = set_bit(c, masks_16[l]);
-            }
-            l++;
-        }
-        
-    }
     free(errorLocation);
-    return c;
 }
 
 static void error_reporter(const struct dc_error *err) {
