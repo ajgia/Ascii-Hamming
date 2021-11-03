@@ -361,7 +361,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     }
 
     // dc_write(env, err, STDOUT_FILENO, "e", 1);
-    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
+    // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
     if (*errorLocation) {
         // toggle error-location'th bit
         *codeWord ^= masks_16[*errorLocation - 1];
