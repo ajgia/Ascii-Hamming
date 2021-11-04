@@ -27,7 +27,6 @@
 int display(const char *str)
 {
     printf("%s\n", str);
-
     return 0;
 }
 
@@ -61,9 +60,7 @@ uint8_t get_mask8(uint8_t byte, uint16_t mask) {
     return masked;
 }
 
-/**
- * Returns 1 if argument is a power of two, 0 otherwise
- */
+
 size_t powerOfTwo(size_t x)
 {
    //checks whether a number is zero or not
@@ -110,15 +107,12 @@ char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_err
     const char ext[] = ".hamming";
     const char sep[] = "-";
 
-    // char pathArr[12][BUF_SIZE] = {{0}};
-    // Redo this initialization to use dynamic memory so this doesn't delete when going out of scope
     char* pathArr = (char*)calloc(12*BUF_SIZE, sizeof(char));
 
     // Make common filepath start
     strncat(pathBeginning, rel, strlen(rel));
     strncat(pathBeginning, prefix, strlen(prefix));
     strncat(pathBeginning, sep, strlen(sep));
-    // printf("path beginning: %s\n", pathBeginning);
 
     // Make an array of strings containing the filepaths 1 through 12
     // Format: {prefix}-0.hamming, {prefix}-1.hamming , ...., {prefix}-11.hamming 
