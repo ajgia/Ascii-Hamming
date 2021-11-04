@@ -463,7 +463,6 @@ void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t
             
         }
 
-        dc_write(env, err, STDOUT_FILENO, bytesToWrite, numBytesToWrite);
         dc_write(env, err, fd, bytesToWrite, numBytesToWrite);
 
         if (dc_error_has_error(err)) {
