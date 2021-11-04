@@ -85,8 +85,8 @@ bool isEven(size_t x) {
     return (x % 2 == 0);
 }
 
-// Return 1 (true) for even, 0 for odd
-bool isEvenParitySetting(const char * parity) {
+// Return 1 for even, 0 for odd, 2 for failure
+int isEvenParitySetting(const char * parity) {
     // Get lowercase
     char *arg = parity;
     for (size_t i = 0; *(arg+i); ++i) {
@@ -94,13 +94,13 @@ bool isEvenParitySetting(const char * parity) {
     }
 
     if (strcmp(arg, "odd") == 0)
-        return false;
+        return 0;
     else if (strcmp(arg, "even") == 0)
-        return true;
-    // Default case, default to even and display warning
+        return 1;
+    // Default case, display warning
     else {
-        display("Warning: please enter only \"even\" or \"odd\" for the parity argument. Defaulting to even.");
-        return true;
+        display("Error: please enter only \"even\" or \"odd\" for the parity argument. Exiting.");
+        return 2;
     }
 }
 

@@ -91,6 +91,13 @@ struct application_settings
     struct dc_setting_string *prefix;
 };
 
+// Defining this here. I don't know why it's not working through the includes
+struct dc_setting_string
+{
+    struct dc_setting parent;
+    char *string;
+};
+
 /**
  * Create DC Application settings
  */ 
@@ -192,7 +199,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "parity",
                     dc_string_from_config,
-                    "even"},
+                    NULL},
             {(struct dc_setting *)settings->prefix,
                     dc_options_set_string,
                     "prefix",
@@ -202,7 +209,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "code"}
+                    NULL}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -224,8 +231,10 @@ static int destroy_settings(const struct dc_posix_env *env,
 
     DC_TRACE(env);
     app_settings = (struct application_settings *)*psettings;
-    dc_setting_string_destroy(env, &app_settings->parity);
-    dc_setting_string_destroy(env, &app_settings->prefix);
+    if ( app_settings->parity->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->parity));
+    if ( app_settings->prefix->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->prefix));
     dc_free(env, app_settings->opts.opts, app_settings->opts.opts_count);
     dc_free(env, *psettings, sizeof(struct application_settings));
 
@@ -257,7 +266,18 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     app_settings = (struct application_settings *)settings;
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-    isEvenParity = isEvenParitySetting(parity);
+
+    if (prefix == NULL || parity == NULL) {
+        display("Error: prefix and parity arguments are required. Exiting.");
+        return EXIT_FAILURE;
+    }
+
+    int paritySetting = isEvenParitySetting(parity);
+    if ( paritySetting != 0 && paritySetting != 1 ) {
+        return EXIT_FAILURE;
+    }
+    else 
+        isEvenParity = (bool)paritySetting;
    
     // File path array
     pathArr = constructFilePathArray(env, err, prefix);
@@ -315,14 +335,20 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     
     // decode codeWords
     // char decoded[ 8] = ""; 
+    size_t nonNulls = 0;
+
     char *decoded = (char*)calloc(numCodeWords, sizeof(char));
 
     for (size_t i = 0; i < numCodeWords; i++) {
         char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
-        decoded[i] = c;
+        if (c != '\0') {
+            decoded[nonNulls] = c;
+            ++nonNulls;
+        }
+        
     }
 
-    dc_write(env, err, STDOUT_FILENO, decoded, numCodeWords);
+    dc_write(env, err, STDOUT_FILENO, decoded, nonNulls);
 
     free(codeWords);
     free(decoded);
@@ -354,7 +380,6 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
 
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             // we have an error in this parity check
-            display("error detected");
             uint8_t cBit = (uint8_t)(log(i)/log(2));
             *errorLocation = set_bit8(*errorLocation, masks_16[cBit]);
         }
@@ -386,6 +411,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
         }
         
     }
+
     free(errorLocation);
     return c;
 }

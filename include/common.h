@@ -34,7 +34,7 @@ uint16_t get_mask(uint16_t byte, uint16_t  mask);
 uint8_t get_mask8(uint8_t byte, uint16_t mask);
 size_t powerOfTwo(size_t x);
 bool isEven(size_t x);
-bool isEvenParitySetting(const char * parity);
+int isEvenParitySetting(const char * parity);
 
 char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix);
 void destroyArray(char* arr);

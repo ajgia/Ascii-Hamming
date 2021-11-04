@@ -17,12 +17,17 @@
 #include <dc_application/defaults.h>
 #include <dc_application/environment.h>
 #include <dc_application/options.h>
+#include <dc_application/application.h>
+#include <dc_application/settings.h>
 #include <dc_posix/dc_stdlib.h>
 #include <dc_posix/dc_string.h>
 #include <dc_posix/dc_fcntl.h>
 #include <dc_util/bits.h>
 #include <dc_util/dump.h>
 #include <dc_util/types.h>
+#include <dc_application/command_line.h>
+#include <dc_application/config.h>
+#include <dc_application/options.h>
 
 #define BUF_SIZE 1024
 
@@ -76,6 +81,13 @@ struct application_settings
     struct dc_opt_settings opts;
     struct dc_setting_string *parity;
     struct dc_setting_string *prefix;
+};
+
+// Defining this here. I don't know why it's not working through the includes
+struct dc_setting_string
+{
+    struct dc_setting parent;
+    char *string;
 };
 
 /**
@@ -201,7 +213,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "parity",
                     dc_string_from_config,
-                    "even"},
+                    NULL},
             {(struct dc_setting *)settings->prefix,
                     dc_options_set_string,
                     "prefix",
@@ -211,7 +223,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "code"}
+                    NULL}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -233,8 +245,11 @@ static int destroy_settings(const struct dc_posix_env *env,
 
     DC_TRACE(env);
     app_settings = (struct application_settings *)*psettings;
-    dc_setting_string_destroy(env, &app_settings->parity);
-    dc_setting_string_destroy(env, &app_settings->prefix);
+    
+    if ( app_settings->parity->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->parity));
+    if ( app_settings->prefix->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->prefix));
     dc_free(env, app_settings->opts.opts, app_settings->opts.opts_count);
     dc_free(env, *psettings, sizeof(struct application_settings));
 
@@ -257,13 +272,25 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     bool isEvenParity;
     
     DC_TRACE(env);
-    ret_val = 0;
+    ret_val = EXIT_SUCCESS;
 
     // Create and get settings
     app_settings = (struct application_settings *)settings;
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-    isEvenParity = isEvenParitySetting(parity);
+
+    if (prefix == NULL || parity == NULL) {
+        display("Error: Prefix and parity arguments are required. Exiting.");
+        return EXIT_FAILURE;
+    }
+    int paritySetting = isEvenParitySetting(parity);
+
+    if ( paritySetting != 0 && paritySetting != 1 ) {
+        display("fuck");
+        return EXIT_FAILURE;
+    }
+    else 
+        isEvenParity = (bool)paritySetting;
 
 
     if (dc_error_has_no_error(err)) {
