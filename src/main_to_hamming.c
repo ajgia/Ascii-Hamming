@@ -17,18 +17,31 @@
 #include <dc_application/defaults.h>
 #include <dc_application/environment.h>
 #include <dc_application/options.h>
+#include <dc_application/application.h>
+#include <dc_application/settings.h>
 #include <dc_posix/dc_stdlib.h>
 #include <dc_posix/dc_string.h>
 #include <dc_posix/dc_fcntl.h>
 #include <dc_util/bits.h>
 #include <dc_util/dump.h>
 #include <dc_util/types.h>
+#include <dc_application/command_line.h>
+#include <dc_application/config.h>
+#include <dc_application/options.h>
 
 #define BUF_SIZE 1024
 
 /**
  * Bit masks
  */ 
+const uint8_t MASK_00000001 = UINT8_C(0x00000001);
+const uint8_t MASK_00000010 = UINT8_C(0x00000002);
+const uint8_t MASK_00000100 = UINT8_C(0x00000004);
+const uint8_t MASK_00001000 = UINT8_C(0x00000008);
+const uint8_t MASK_00010000 = UINT8_C(0x00000010);
+const uint8_t MASK_00100000 = UINT8_C(0x00000020);
+const uint8_t MASK_01000000 = UINT8_C(0x00000040);
+const uint8_t MASK_10000000 = UINT8_C(0x00000080);
 const uint16_t MASK_00000000_00000001 = UINT16_C(0x00000001);
 const uint16_t MASK_00000000_00000010 = UINT16_C(0x00000002);
 const uint16_t MASK_00000000_00000100 = UINT16_C(0x00000004);
@@ -45,6 +58,20 @@ const uint16_t MASK_00010000_00000000 = UINT16_C(0x00001000);
 const uint16_t MASK_00100000_00000000 = UINT16_C(0x00002000);
 const uint16_t MASK_01000000_00000000 = UINT16_C(0x00004000);
 const uint16_t MASK_10000000_00000000 = UINT16_C(0x00008000);
+
+/**
+ * Bit mask array
+ */ 
+static const uint8_t masks_8[] = {
+    MASK_00000001,
+    MASK_00000010,
+    MASK_00000100,
+    MASK_00001000,
+    MASK_00010000,
+    MASK_00100000,
+    MASK_01000000,
+    MASK_10000000
+};
 
 /**
  * Bit mask array
@@ -68,6 +95,7 @@ static const uint16_t masks_16[] = {
     MASK_10000000_00000000
 };
 
+
 /**
  * DC Application settings
  */ 
@@ -76,6 +104,13 @@ struct application_settings
     struct dc_opt_settings opts;
     struct dc_setting_string *parity;
     struct dc_setting_string *prefix;
+};
+
+// Defining this here. I don't know why it's not working through the includes
+struct dc_setting_string
+{
+    struct dc_setting parent;
+    char *string;
 };
 
 /**
@@ -109,24 +144,33 @@ static void trace_reporter(const struct dc_posix_env *env,
 
 
 /**
- * Set parity bits
+ * Set parity bits of a uint16_t
+ * @param env dc_env
+ * @param err dc_err
+ * @param isEvenParity boolean for parity
+ * @param dest uint16_t pointer to destination to modify
  */ 
-void setParityBits( const struct dc_posix_env *env,
-                        const struct dc_error *err,
-                        bool isEvenParity,
-                        uint16_t * dest);  
+void setParityBits( bool isEvenParity,
+                    uint16_t * dest);  
 /**
  * Copy 8 bit char into 12 bit hamming format documented in darcy_design.txt
  * Parity bits are not set here.
+ * @param env dc_env
+ * @param err dc_err
+ * @param input uint8_t input
+ * @param dest uint16_t destination for hamming code format
  */ 
-void copyUint8_tIntoHammingFormatUint16_t ( const struct dc_posix_env *env,
-                                            const struct dc_error *err, 
-                                            const uint8_t,
+void copyUint8_tIntoHammingFormatUint16_t ( const uint8_t input,
                                             uint16_t * dest);
 /**
  * Write hamming codeword to the 12 files, 1 bit of each word per file.
+ * @param env dc_env
+ * @param err dc_err
+ * @param sourcePtr pointer to uint16_t memory block of input data
+ * @param numCodeWords number of code words to write to files
+ * @param prefix prefix argument used to generate file names
  */ 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix);
 
 /**
  * Main
@@ -140,8 +184,8 @@ int main(int argc, char * argv[]) {
     int ret_val;
 
     reporter = error_reporter;
+    tracer = trace_reporter;
     tracer = NULL;
-    // tracer = trace_reporter;
     dc_error_init(&err, reporter);
     dc_posix_env_init(&env, tracer);
     info = dc_application_info_create(&env, &err, "To Hamming Application");
@@ -153,7 +197,6 @@ int main(int argc, char * argv[]) {
 
 static struct dc_application_settings *create_settings(const struct dc_posix_env *env, struct dc_error *err)
 {
-    static bool default_verbose = false;
     struct application_settings *settings;
 
     DC_TRACE(env);
@@ -188,7 +231,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "parity",
                     dc_string_from_config,
-                    "even"},
+                    NULL},
             {(struct dc_setting *)settings->prefix,
                     dc_options_set_string,
                     "prefix",
@@ -198,7 +241,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "code"}
+                    NULL}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -220,8 +263,11 @@ static int destroy_settings(const struct dc_posix_env *env,
 
     DC_TRACE(env);
     app_settings = (struct application_settings *)*psettings;
-    dc_setting_string_destroy(env, &app_settings->parity);
-    dc_setting_string_destroy(env, &app_settings->prefix);
+    
+    if ( app_settings->parity->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->parity));
+    if ( app_settings->prefix->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->prefix));
     dc_free(env, app_settings->opts.opts, app_settings->opts.opts_count);
     dc_free(env, *psettings, sizeof(struct application_settings));
 
@@ -238,19 +284,31 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     const char *parity;
     const char *prefix;
 
-    char chars[BUF_SIZE];
+    unsigned char chars[BUF_SIZE];
     ssize_t nread;
     int ret_val;
     bool isEvenParity;
     
     DC_TRACE(env);
-    ret_val = 0;
+    ret_val = EXIT_SUCCESS;
 
     // Create and get settings
     app_settings = (struct application_settings *)settings;
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-    isEvenParity = isEvenParitySetting(parity);
+
+    if (prefix == NULL || parity == NULL) {
+        display("Error: Prefix and parity arguments are required. Exiting.");
+        return EXIT_FAILURE;
+    }
+    int paritySetting = isEvenParitySetting(parity);
+
+    if ( paritySetting != 0 && paritySetting != 1 ) {
+        display("fuck");
+        return EXIT_FAILURE;
+    }
+    else 
+        isEvenParity = (bool)paritySetting;
 
 
     if (dc_error_has_no_error(err)) {
@@ -261,17 +319,13 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
                 ret_val = 1;
             }
 
-            uint16_t * dest = (uint16_t*)calloc(nread, sizeof(uint16_t));
+            uint16_t * dest = (uint16_t*)calloc((size_t)nread, sizeof(uint16_t));
 
             // Loop to process each char of line
-            for(size_t i = 0; i < nread; i++) {
-                copyUint8_tIntoHammingFormatUint16_t(env, err, chars[i], (dest + i));
-                setParityBits(env, err, isEvenParity, (dest + i));
+            for(size_t i = 0; i < (size_t)nread; i++) {
+                copyUint8_tIntoHammingFormatUint16_t(chars[i], (dest + i));
+                setParityBits(isEvenParity, (dest + i));
             }
-
-            // display line("dc_writes:");
-            // dc_write(env, err, STDOUT_FILENO, chars, nread);
-            // dc_write(env, err, STDOUT_FILENO, dest, (nread * 2 ));
 
             // Write *dest to files 1 through 12
             writeToFiles(env, err, dest, (size_t)nread, prefix);
@@ -291,7 +345,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
  * Hamming-format: DPPD PDDD PDDD 0000  , where D = Data bit, P = parity bit, 0 = padding
  * DOES NOT SET THE PARITY BITS
  */ 
-void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const struct dc_error *err, const uint8_t c, uint16_t * dest) {
+void copyUint8_tIntoHammingFormatUint16_t (const uint8_t c, uint16_t * dest) {
     // Counter for data word
     size_t i = 0;
     // Counter for 16 bit destination
@@ -328,12 +382,12 @@ void copyUint8_tIntoHammingFormatUint16_t (const struct dc_posix_env *env, const
     //      a) for each bit check, get masked version at bit position and add result to a count
     //        b) result of count (whether count is even or odd) is the bit parity
     // 2. Set parity of 2^n bit depending on even or odd parity
-void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, bool isEvenParity, uint16_t *dest) {
+void setParityBits(bool isEvenParity, uint16_t *dest) {
     size_t parityCount;
     size_t j;
     size_t k;
 
-    for (size_t i = pow(2,0); i <= pow(2,4); i <<= 1 ) {
+    for (size_t i = 1; i <= 16; i <<= 1 ) {
         parityCount = 0;
         j = i;
         while ( j <= pow(2,4) ) {
@@ -358,10 +412,10 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
     }
 }
 
-void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
+void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
     char* pathArr;
     int fd;
-    pathArr = constructFilePathArray(env, err, prefix);
+    pathArr = constructFilePathArray(prefix);
 
     // Bit counter
     size_t l = 0;
@@ -403,7 +457,7 @@ void writeToFiles(const struct dc_posix_env *env, const struct dc_error *err, ui
             if ( get_mask((*(sourcePtr+j)), masks_16[i]) ) {
                 // set byte's j'th bit for code-word i'th bit
                 // byteToWrite = set_bit8(byteToWrite, masks_16[j]);
-                *(bytesToWrite+k) = set_bit8(*(bytesToWrite+k), masks_16[l]);
+                *(bytesToWrite+k) = set_bit8(*(bytesToWrite+k), masks_8[l]);
             }
             ++l;
             
@@ -428,9 +482,10 @@ static void error_reporter(const struct dc_error *err) {
     fprintf(stderr, "ERROR: %s\n", err->message);
 }
 
-static void trace_reporter(__attribute__((unused))  const struct dc_posix_env *env,
-                                                    const char *file_name,
-                                                    const char *function_name,
-                                                    size_t line_number) {
+static void trace_reporter ( const struct dc_posix_env *env,
+                            const char *file_name,
+                            const char *function_name,
+                            size_t line_number) {
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
+    fprintf(stdout, "POSIX ENV: %d\n", env->zero_free); // cheeky warning silencer for unused variable env
 }

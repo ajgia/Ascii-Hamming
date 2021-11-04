@@ -27,7 +27,6 @@
 int display(const char *str)
 {
     printf("%s\n", str);
-
     return 0;
 }
 
@@ -37,7 +36,7 @@ uint16_t set_bit(uint16_t byte, uint16_t mask) {
     return set;
 }
 
-uint8_t set_bit8(uint8_t byte, uint16_t mask) {
+uint8_t set_bit8(uint8_t byte, uint8_t mask) {
     uint8_t set;
     set = byte | mask;
     return set;
@@ -55,15 +54,13 @@ uint16_t get_mask(uint16_t byte, uint16_t  mask) {
     return masked;
 }
 
-uint8_t get_mask8(uint8_t byte, uint8_t mask) {
+uint8_t get_mask8(uint8_t byte, uint16_t mask) {
     uint8_t masked;
     masked = byte & mask;
     return masked;
 }
 
-/**
- * Returns 1 if argument is a power of two, 0 otherwise
- */
+
 size_t powerOfTwo(size_t x)
 {
    //checks whether a number is zero or not
@@ -85,40 +82,39 @@ bool isEven(size_t x) {
     return (x % 2 == 0);
 }
 
-// Return 1 (true) for even, 0 for odd
-bool isEvenParitySetting(const char * parity) {
+// Return 1 for even, 0 for odd, 2 for failure
+int isEvenParitySetting(const char * parity) {
+    char arg [strlen(parity) + 1];
     // Get lowercase
-    char *arg = parity;
+    // char *arg = parity;
+    strcpy(arg, parity);
     for (size_t i = 0; *(arg+i); ++i) {
-        *(arg+i) = tolower(*(arg+i));
+        *(arg+i) = (char)tolower(*(arg+i));
     }
 
     if (strcmp(arg, "odd") == 0)
-        return false;
+        return 0;
     else if (strcmp(arg, "even") == 0)
-        return true;
-    // Default case, default to even and display warning
+        return 1;
+    // Default case, display warning
     else {
-        display("Warning: please enter only \"even\" or \"odd\" for the parity argument. Defaulting to even.");
-        return true;
+        display("Error: please enter only \"even\" or \"odd\" for the parity argument. Exiting.");
+        return 2;
     }
 }
 
-char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix) {
+char* constructFilePathArray(const char * prefix) {
     char pathBeginning[BUF_SIZE] = "";
     const char rel[] = "./";
     const char ext[] = ".hamming";
     const char sep[] = "-";
 
-    // char pathArr[12][BUF_SIZE] = {{0}};
-    // Redo this initialization to use dynamic memory so this doesn't delete when going out of scope
     char* pathArr = (char*)calloc(12*BUF_SIZE, sizeof(char));
 
     // Make common filepath start
     strncat(pathBeginning, rel, strlen(rel));
     strncat(pathBeginning, prefix, strlen(prefix));
     strncat(pathBeginning, sep, strlen(sep));
-    // printf("path beginning: %s\n", pathBeginning);
 
     // Make an array of strings containing the filepaths 1 through 12
     // Format: {prefix}-0.hamming, {prefix}-1.hamming , ...., {prefix}-11.hamming 
@@ -129,7 +125,7 @@ char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_err
         
         // Number append
         char buffer[10];
-        snprintf(buffer, 10, "%d", i);
+        snprintf(buffer, 10, "%zu", i);
         strncat(path, buffer, strlen(buffer));
 
         strncat(path, ext, strlen(ext));

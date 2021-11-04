@@ -2,40 +2,84 @@
 #define TEMPLATE_COMMON_H
 #include <stdlib.h>
 #include <dc_posix/dc_unistd.h>
-/*
- * This file is part of dc_dump.
- *
- *  dc_dump is free software: you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation, either version 3 of the License, or
- *  (at your option) any later version.
- *
- *  Foobar is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with dc_dump.  If not, see <https://www.gnu.org/licenses/>.
- */
-
 
 /**
- * A function to be documented.
- *
- * @param str a parameter to be documented.
- * @return a return value to be documented.
+ * Prints to std_out the string argument followed by a newline
+ * @param str a string pointer
+ * @return an int
  */
 int display(const char *str);
 uint16_t set_bit(uint16_t byte, uint16_t mask);
-uint8_t set_bit8(uint8_t byte, uint16_t mask);
+/**
+ * Sets mask bit of byte argument 
+ * @param byte a uint8_t to set
+ * @param mask a uint8_t mask
+ * @return a uint8_t
+ */ 
+uint8_t set_bit8(uint8_t byte, uint8_t mask);
+/**
+ * Prints masked byte argument
+ * @param byte a uint8_t to print
+ * @param mask a uint16_t mask
+ */ 
+void print_mask8(uint8_t byte, uint16_t mask);
+/**
+ * Gets masked byte
+ * @param byte a uint8_t to get from
+ * @param mask a uint16_t mask
+ * @return a uint8_t
+ */ 
+uint8_t get_mask8(uint8_t byte, uint16_t mask);
+/**
+ * Prints masked byte argument
+ * @param byte a uint16_t to print
+ * @param mask a uint16_t mask
+ */ 
 void print_mask(uint16_t byte, uint16_t mask);
-uint16_t get_mask(uint16_t byte, uint16_t  mask);
-uint8_t get_mask8(uint8_t byte, uint8_t mask);
-size_t powerOfTwo(size_t x);
-bool isEven(size_t x);
-bool isEvenParitySetting(const char * parity);
+/**
+ * Gets masked byte
+ * @param byte a uint16_t to get from
+ * @param mask a uint16_t mask
+ * @return a uint16_t
+ */ 
+uint16_t get_mask(uint16_t byte, uint16_t mask);
 
-char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix);
+/**
+ * @brief Checks if power of two
+ * 
+ * @param x arg to check
+ * @return size_t 1 for true, 0 for false
+ */
+size_t powerOfTwo(size_t x);
+/**
+ * @brief Checks if arg is even
+ * 
+ * @param x size_t
+ * @return true even
+ * @return false odd
+ */
+bool isEven(size_t x);
+/**
+ * @brief Interpets string value into parity setting
+ * 
+ * @param parity char*
+ * @return int 0 for odd, 1 for even, 2 for invalid string arg
+ */
+int isEvenParitySetting(const char * parity);
+
+/**
+ * @brief Returns array of filepaths in the format {{prefix}-i.hamming} where i is a number 1 through 11.
+ * 
+ * @param env 
+ * @param err 
+ * @param prefix 
+ * @return char* array
+ */
+char* constructFilePathArray(const char * prefix);
+/**
+ * @brief Destroys file path array
+ * 
+ * @param arr 
+ */
 void destroyArray(char* arr);
 #endif // TEMPLATE_COMMON_H

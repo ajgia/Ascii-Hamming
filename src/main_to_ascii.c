@@ -37,10 +37,17 @@
 
 #define BUF_SIZE 1024
 
-
 /**
  * Bit masks
  */ 
+const uint8_t MASK_00000001 = UINT8_C(0x00000001);
+const uint8_t MASK_00000010 = UINT8_C(0x00000002);
+const uint8_t MASK_00000100 = UINT8_C(0x00000004);
+const uint8_t MASK_00001000 = UINT8_C(0x00000008);
+const uint8_t MASK_00010000 = UINT8_C(0x00000010);
+const uint8_t MASK_00100000 = UINT8_C(0x00000020);
+const uint8_t MASK_01000000 = UINT8_C(0x00000040);
+const uint8_t MASK_10000000 = UINT8_C(0x00000080);
 const uint16_t MASK_00000000_00000001 = UINT16_C(0x00000001);
 const uint16_t MASK_00000000_00000010 = UINT16_C(0x00000002);
 const uint16_t MASK_00000000_00000100 = UINT16_C(0x00000004);
@@ -57,6 +64,20 @@ const uint16_t MASK_00010000_00000000 = UINT16_C(0x00001000);
 const uint16_t MASK_00100000_00000000 = UINT16_C(0x00002000);
 const uint16_t MASK_01000000_00000000 = UINT16_C(0x00004000);
 const uint16_t MASK_10000000_00000000 = UINT16_C(0x00008000);
+
+/**
+ * Bit mask array
+ */ 
+static const uint8_t masks_8[] = {
+    MASK_00000001,
+    MASK_00000010,
+    MASK_00000100,
+    MASK_00001000,
+    MASK_00010000,
+    MASK_00100000,
+    MASK_01000000,
+    MASK_10000000
+};
 
 /**
  * Bit mask array
@@ -91,6 +112,13 @@ struct application_settings
     struct dc_setting_string *prefix;
 };
 
+// Defining this here. I don't know why it's not working through the includes
+struct dc_setting_string
+{
+    struct dc_setting parent;
+    char *string;
+};
+
 /**
  * Create DC Application settings
  */ 
@@ -110,21 +138,26 @@ static void error_reporter(const struct dc_error *err);
 /**
  * Trace reporter
  */ 
-static void trace_reporter(const struct dc_posix_env *env,
-                          const char *file_name,
-                          const char *function_name,
-                          size_t line_number);
+static void trace_reporter( const struct dc_posix_env *env,
+                            const char *file_name,
+                            const char *function_name,
+                            size_t line_number);
 
 /**
- * Translate to ASCII
+ * Translate Hamming to ASCII
  */ 
 static int run( const struct dc_posix_env *env,
                 struct dc_error *err,
                 struct dc_application_settings *settings);
 /**
- * Decode a code word
+ * Decode a Hamming Codeword and return the translated character.
+ * @param env dc_env
+ * @param er dc_err
+ * @param codeWord the codeword to decode
+ * @param isEvenParity the parity to use to decode the codeword
+ * @return the decoded character
  */ 
-char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity);
+unsigned char decodeCodeWord(uint16_t *codeWord, bool isEvenParity);
 
 
 /**
@@ -139,8 +172,8 @@ int main(int argc, char * argv[]) {
     int ret_val;
 
     reporter = error_reporter;
+    tracer = trace_reporter;
     tracer = NULL;
-    // tracer = trace_reporter;
     dc_error_init(&err, reporter);
     dc_posix_env_init(&env, tracer);
     info = dc_application_info_create(&env, &err, "To ASCII Application");
@@ -152,7 +185,6 @@ int main(int argc, char * argv[]) {
 
 static struct dc_application_settings *create_settings(const struct dc_posix_env *env, struct dc_error *err)
 {
-    static bool default_verbose = false;
     struct application_settings *settings;
 
     DC_TRACE(env);
@@ -187,7 +219,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "parity",
                     dc_string_from_config,
-                    "even"},
+                    NULL},
             {(struct dc_setting *)settings->prefix,
                     dc_options_set_string,
                     "prefix",
@@ -197,7 +229,7 @@ static struct dc_application_settings *create_settings(const struct dc_posix_env
                     dc_string_from_string,
                     "prefix",
                     dc_string_from_config,
-                    "code"}
+                    NULL}
     };
 
     // note the trick here - we use calloc and add 1 to ensure the last line is all 0/NULL
@@ -219,8 +251,10 @@ static int destroy_settings(const struct dc_posix_env *env,
 
     DC_TRACE(env);
     app_settings = (struct application_settings *)*psettings;
-    dc_setting_string_destroy(env, &app_settings->parity);
-    dc_setting_string_destroy(env, &app_settings->prefix);
+    if ( app_settings->parity->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->parity));
+    if ( app_settings->prefix->string != NULL)
+        dc_setting_string_destroy(env, &(app_settings->prefix));
     dc_free(env, app_settings->opts.opts, app_settings->opts.opts_count);
     dc_free(env, *psettings, sizeof(struct application_settings));
 
@@ -252,10 +286,21 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     app_settings = (struct application_settings *)settings;
     parity = dc_setting_string_get(env, app_settings->parity);
     prefix = dc_setting_string_get(env, app_settings->prefix);
-    isEvenParity = isEvenParitySetting(parity);
+
+    if (prefix == NULL || parity == NULL) {
+        display("Error: prefix and parity arguments are required. Exiting.");
+        return EXIT_FAILURE;
+    }
+
+    int paritySetting = isEvenParitySetting(parity);
+    if ( paritySetting != 0 && paritySetting != 1 ) {
+        return EXIT_FAILURE;
+    }
+    else 
+        isEvenParity = (bool)paritySetting;
    
     // File path array
-    pathArr = constructFilePathArray(env, err, prefix);
+    pathArr = constructFilePathArray(prefix);
     // Holds each decoded code word
     codeWords = (uint16_t*)calloc(BUF_SIZE, sizeof(uint16_t));
 
@@ -271,15 +316,15 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
         }
 
         if (dc_error_has_no_error(err)) {
-            char* chars = calloc(BUF_SIZE, 1024);
+            unsigned char* chars = calloc(BUF_SIZE, 1024);
             while((nread = dc_read(env, err, fd, chars, BUF_SIZE)) > 0) {
 
                 // loop through bytes
-                for (size_t k = 0; k < nread; k++) {
+                for (size_t k = 0; k < (size_t)nread; k++) {
                     
                     // loop through bits in byte
                     for (size_t l = 0; l < 8; l++) {
-                        if (get_mask(*(chars+k), masks_16[l])) {
+                        if (get_mask8(*(chars+k), masks_16[l])) {
                             *(codeWords+l+8*k) = set_bit(*(codeWords+l+8*k), masks_16[i]);
                     
                         }
@@ -292,8 +337,8 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
 
 
                 // store nread
-                if (maxRead < nread)
-                    maxRead = nread;
+                if (maxRead < (size_t)nread)
+                    maxRead = (size_t)nread;
             }
             free(chars);
         }
@@ -309,30 +354,36 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
     // dc_write(env, err, STDOUT_FILENO, codeWords, numCodeWords * sizeof(uint16_t));
     
     // decode codeWords
-    // char decoded[ 8] = ""; 
-    char *decoded = (char*)calloc(numCodeWords, sizeof(char));
+    // char decoded[ 8] = "";
+    size_t nonNulls = 0;
+
+    unsigned char *decoded = (unsigned char*)calloc(numCodeWords, sizeof(char));
 
     for (size_t i = 0; i < numCodeWords; i++) {
-        char c = decodeCodeWord(env, err, codeWords+i, isEvenParity);
-        decoded[i] = c;
+        unsigned char c = decodeCodeWord(codeWords+i, isEvenParity);
+        if (c != '\0') {
+            decoded[nonNulls] = c;
+            ++nonNulls;
+        }
+        
     }
 
-    dc_write(env, err, STDOUT_FILENO, decoded, numCodeWords);
+    dc_write(env, err, STDOUT_FILENO, decoded, nonNulls);
 
     free(codeWords);
     free(decoded);
     return ret_val;
 }
 
-char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16_t *codeWord, bool isEvenParity) {
-    char c = '\0';
+unsigned char decodeCodeWord(uint16_t *codeWord, bool isEvenParity) {
+    unsigned char c = '\0';
     size_t parityCount;
     size_t j;
     size_t k;
     uint8_t *errorLocation = (uint8_t*)calloc(1, sizeof(uint8_t));
     // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
 
-    for (size_t i = pow(2,0); i < pow(2,4); i <<= 1) {
+    for (size_t i = 1; i < 16; i <<= 1) {
         parityCount = 0;
         j = i;
         while ( j < pow(2,4)) {
@@ -349,13 +400,13 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
 
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             // we have an error in this parity check
-            uint8_t cBit = log(i)/log(2);
-            *errorLocation = set_bit(*errorLocation, masks_16[cBit]);
+            uint8_t cBit = (uint8_t)(log(i)/log(2));
+            *errorLocation = set_bit8(*errorLocation, masks_8[cBit]);
         }
     }
 
     // dc_write(env, err, STDOUT_FILENO, "e", 1);
-    dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
+    // dc_write(env, err, STDOUT_FILENO, errorLocation, 1);
     if (*errorLocation) {
         // toggle error-location'th bit
         *codeWord ^= masks_16[*errorLocation - 1];
@@ -366,7 +417,7 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
     for (size_t i = 1; i <= 12; ++i) {
         if (!powerOfTwo(i)) {
             if( get_mask(*codeWord, masks_16[i-1]) ) {
-                c = set_bit(c, masks_16[l]);
+                c = set_bit8(c, masks_8[l]);
             }
             l++;
         } else {
@@ -374,12 +425,13 @@ char decodeCodeWord(const struct dc_posix_env *env, struct dc_error *err, uint16
                 i++;
             }
             if (get_mask(*codeWord, masks_16[i-1])) {
-                c = set_bit(c, masks_16[l]);
+                c = set_bit8(c, masks_8[l]);
             }
             l++;
         }
         
     }
+
     free(errorLocation);
     return c;
 }
@@ -389,10 +441,11 @@ static void error_reporter(const struct dc_error *err) {
     fprintf(stderr, "ERROR: %s\n", err->message);
 }
 
-static void trace_reporter(__attribute__((unused))  const struct dc_posix_env *env,
-                                                    const char *file_name,
-                                                    const char *function_name,
-                                                    size_t line_number) {
+static void trace_reporter( const struct dc_posix_env *env,
+                            const char *file_name,
+                            const char *function_name,
+                            size_t line_number) {
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
-
+    fprintf(stdout, "POSIX ENV: %d\n", env->zero_free); // cheeky warning silencer for unused variable env
 }
+
