@@ -37,10 +37,17 @@
 
 #define BUF_SIZE 1024
 
-
 /**
  * Bit masks
  */ 
+const uint8_t MASK_00000001 = UINT8_C(0x00000001);
+const uint8_t MASK_00000010 = UINT8_C(0x00000002);
+const uint8_t MASK_00000100 = UINT8_C(0x00000004);
+const uint8_t MASK_00001000 = UINT8_C(0x00000008);
+const uint8_t MASK_00010000 = UINT8_C(0x00000010);
+const uint8_t MASK_00100000 = UINT8_C(0x00000020);
+const uint8_t MASK_01000000 = UINT8_C(0x00000040);
+const uint8_t MASK_10000000 = UINT8_C(0x00000080);
 const uint16_t MASK_00000000_00000001 = UINT16_C(0x00000001);
 const uint16_t MASK_00000000_00000010 = UINT16_C(0x00000002);
 const uint16_t MASK_00000000_00000100 = UINT16_C(0x00000004);
@@ -57,6 +64,20 @@ const uint16_t MASK_00010000_00000000 = UINT16_C(0x00001000);
 const uint16_t MASK_00100000_00000000 = UINT16_C(0x00002000);
 const uint16_t MASK_01000000_00000000 = UINT16_C(0x00004000);
 const uint16_t MASK_10000000_00000000 = UINT16_C(0x00008000);
+
+/**
+ * Bit mask array
+ */ 
+static const uint8_t masks_8[] = {
+    MASK_00000001,
+    MASK_00000010,
+    MASK_00000100,
+    MASK_00001000,
+    MASK_00010000,
+    MASK_00100000,
+    MASK_01000000,
+    MASK_10000000
+};
 
 /**
  * Bit mask array
@@ -380,7 +401,7 @@ unsigned char decodeCodeWord(uint16_t *codeWord, bool isEvenParity) {
         if ( (!isEven(parityCount) && isEvenParity ) || ( isEven(parityCount) && !isEvenParity) ) {
             // we have an error in this parity check
             uint8_t cBit = (uint8_t)(log(i)/log(2));
-            *errorLocation = set_bit8(*errorLocation, masks_16[cBit]);
+            *errorLocation = set_bit8(*errorLocation, masks_8[cBit]);
         }
     }
 
@@ -396,7 +417,7 @@ unsigned char decodeCodeWord(uint16_t *codeWord, bool isEvenParity) {
     for (size_t i = 1; i <= 12; ++i) {
         if (!powerOfTwo(i)) {
             if( get_mask(*codeWord, masks_16[i-1]) ) {
-                c = set_bit8(c, masks_16[l]);
+                c = set_bit8(c, masks_8[l]);
             }
             l++;
         } else {
@@ -404,7 +425,7 @@ unsigned char decodeCodeWord(uint16_t *codeWord, bool isEvenParity) {
                 i++;
             }
             if (get_mask(*codeWord, masks_16[i-1])) {
-                c = set_bit8(c, masks_16[l]);
+                c = set_bit8(c, masks_8[l]);
             }
             l++;
         }
@@ -425,6 +446,6 @@ static void trace_reporter( const struct dc_posix_env *env,
                             const char *function_name,
                             size_t line_number) {
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
-
+    fprintf(stdout, "POSIX ENV: %d\n", env->zero_free); // cheeky warning silencer for unused variable env
 }
 
