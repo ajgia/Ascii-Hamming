@@ -1,13 +1,28 @@
 Alex Giasson A00982145
 Assignment 2 Hamming-to-ASCII Design Documentation
 
-Programs:
-main_to_hamming - Translates ASCII input to Hamming code
-main_to_ascii - Translates Hamming input to ASCII
-
 Functionality:
 main_to_hamming will read lines of input from STD_IN and write the hamming code to 12 files 
 main_to_ascii will read the 12 files, decode the hamming code, perform any error correction, and write the resulting ASCII to STD_OUT
+
+
+High-level approaches:
+ASCII2Hamming
+1. Read in unsigned chars
+2. For each of those chars, space out the data bits into 12 bit hamming format using a uint16_t as a container.
+3. Evaluate the parity and set parity bits in positions 1, 2, 4, 8.
+4. Write to files 1 bit from each char.
+
+Hamming2ASCII
+1. Open 12 files.
+2. Create a uint16_t as a container for the 12-bit Hamming code word we'll construct
+3. For each file, pull a bit from it and put it into the appropriate position in the code word container.
+4. Do this for all bits to get all code words.
+5. Evaluate parity again, and construct the error location if there is one.
+6. Attempt error correction: Flip error location bit if exists.
+7. Decode data bits of codeword into char
+8. Ignore null byte chars and display output.
+
 
 Hamming protocol:
 Hamming 12 8
@@ -20,8 +35,14 @@ Bit 4 parity checks bits in positions 4, 5, 6, 7, 12 -> Check 2^2 bits, skip 2^2
 Bit 8 parity checks bits in positions 8, 9, 10, 11, 12 -> Check 2^3 bits, skip 2^3 bits, etc
 Parity check adds bits and sets the parity bit to get an even or odd result.
 
-This provides capability for one bit error correction.
+This provides capability for one bit error correction and 2 bit error detection.
 
+
+Reflecion:
+    1. Had to redo the hamming at one point because I didn't fully understand it and my implementation was self-limiting in error detection. 
+        Next time, check depth of understanding with more scratch work of BOTH sides (coding AND decoding)
+    2. Break large functions up more (way more)
+    3. Bit masks and arrays should be in a common file 
 
 DC_Libraries used:
 DC_Util
