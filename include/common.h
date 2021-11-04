@@ -16,7 +16,7 @@ uint16_t set_bit(uint16_t byte, uint16_t mask);
  * @param mask a uint8_t mask
  * @return a uint8_t
  */ 
-uint8_t set_bit8(uint8_t byte, uint16_t mask);
+uint8_t set_bit8(uint8_t byte, uint8_t mask);
 /**
  * Prints masked byte argument
  * @param byte a uint8_t to print
@@ -75,7 +75,7 @@ int isEvenParitySetting(const char * parity);
  * @param prefix 
  * @return char* array
  */
-char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix);
+char* constructFilePathArray(const char * prefix);
 /**
  * @brief Destroys file path array
  * 

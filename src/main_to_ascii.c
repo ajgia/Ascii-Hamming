@@ -280,7 +280,7 @@ static int run(const struct dc_posix_env *env, struct dc_error *err, struct dc_a
         isEvenParity = (bool)paritySetting;
    
     // File path array
-    pathArr = constructFilePathArray(env, err, prefix);
+    pathArr = constructFilePathArray(prefix);
     // Holds each decoded code word
     codeWords = (uint16_t*)calloc(BUF_SIZE, sizeof(uint16_t));
 

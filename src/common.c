@@ -36,7 +36,7 @@ uint16_t set_bit(uint16_t byte, uint16_t mask) {
     return set;
 }
 
-uint8_t set_bit8(uint8_t byte, uint16_t mask) {
+uint8_t set_bit8(uint8_t byte, uint8_t mask) {
     uint8_t set;
     set = byte | mask;
     return set;
@@ -84,8 +84,10 @@ bool isEven(size_t x) {
 
 // Return 1 for even, 0 for odd, 2 for failure
 int isEvenParitySetting(const char * parity) {
+    char arg [strlen(parity) + 1];
     // Get lowercase
-    char *arg = parity;
+    // char *arg = parity;
+    strcpy(arg, parity);
     for (size_t i = 0; *(arg+i); ++i) {
         *(arg+i) = (char)tolower(*(arg+i));
     }
@@ -101,7 +103,7 @@ int isEvenParitySetting(const char * parity) {
     }
 }
 
-char* constructFilePathArray(const struct dc_posix_env *env, const struct dc_error *err, const char * prefix) {
+char* constructFilePathArray(const char * prefix) {
     char pathBeginning[BUF_SIZE] = "";
     const char rel[] = "./";
     const char ext[] = ".hamming";

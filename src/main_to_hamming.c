@@ -397,7 +397,7 @@ void setParityBits(const struct dc_posix_env *env, const struct dc_error *err, b
 void writeToFiles(const struct dc_posix_env *env, struct dc_error *err, uint16_t * sourcePtr, size_t numCodeWords, const char * prefix) {    
     char* pathArr;
     int fd;
-    pathArr = constructFilePathArray(env, err, prefix);
+    pathArr = constructFilePathArray(prefix);
 
     // Bit counter
     size_t l = 0;
