@@ -165,8 +165,8 @@ int main(int argc, char * argv[]) {
     int ret_val;
 
     reporter = error_reporter;
+    tracer = trace_reporter;
     tracer = NULL;
-    // tracer = trace_reporter;
     dc_error_init(&err, reporter);
     dc_posix_env_init(&env, tracer);
     info = dc_application_info_create(&env, &err, "To Hamming Application");
@@ -464,9 +464,9 @@ static void error_reporter(const struct dc_error *err) {
     fprintf(stderr, "ERROR: %s\n", err->message);
 }
 
-static void trace_reporter(__attribute__((unused))  const struct dc_posix_env *env,
-                                                    const char *file_name,
-                                                    const char *function_name,
-                                                    size_t line_number) {
+static void trace_reporter ( const struct dc_posix_env *env,
+                            const char *file_name,
+                            const char *function_name,
+                            size_t line_number) {
     fprintf(stdout, "TRACE: %s : %s : @ %zu\n", file_name, function_name, line_number);
 }
